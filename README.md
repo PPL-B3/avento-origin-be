@@ -39,6 +39,16 @@ $ docker compose up -d
 $ pnpm run seed
 ```
 
+## `.env` file example
+```
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=password123
+POSTGRES_DB=avento_origin
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?schema=public"
+```
+
 ## Compile and run the project
 
 ```bash
