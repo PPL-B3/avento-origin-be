@@ -32,6 +32,13 @@
 $ pnpm install
 ```
 
+## Database setup
+
+```bash
+$ docker compose up -d
+$ pnpm run seed
+```
+
 ## Compile and run the project
 
 ```bash
