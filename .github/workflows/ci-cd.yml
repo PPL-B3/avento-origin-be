@@ -123,4 +123,4 @@ jobs:
             -e POSTGRES_HOST=${{ secrets.DB_HOST }} \
             -e POSTGRES_PORT=${{ secrets.DB_PORT }} \
             -e DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public \
-            -d --name ${{ secrets.IMAGE_NAME }}_container -p 4000:4000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+            -d --network=host --name ${{ secrets.IMAGE_NAME }}_container -p 4000:4000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
