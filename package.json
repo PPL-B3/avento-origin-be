@@ -70,7 +70,9 @@
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
+    "collectCoverage": true,
     "coverageDirectory": "../coverage",
+    "coverageReporters": ["lcov", "text"],
     "testEnvironment": "node"
   }
 }
