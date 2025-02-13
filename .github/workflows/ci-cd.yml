@@ -64,7 +64,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build --build-arg POSTGRES_USER=${{ secrets.DB_USER }} \
-          --build-arg POSTGRES_PASSWORD=${{ secrets.DB_PASS }} \ 
+          --build-arg POSTGRES_PASSWORD=${{ secrets.DB_PASS }} \
           --build-arg POSTGRES_DB=${{ secrets.DB_DB }} \
           --build-arg POSTGRES_HOST=${{ secrets.DB_HOST }} \
           --build-arg POSTGRES_PORT=${{ secrets.DB_PORT }} \
