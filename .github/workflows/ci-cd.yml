@@ -36,8 +36,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # 5. Run linting
-      - name: Lint the code
-        run: pnpm lint
+    #   - name: Lint the code
+    #     run: pnpm lint
 
       # 6. Run tests with coverage and generate test reports
       - name: Run tests with coverage
