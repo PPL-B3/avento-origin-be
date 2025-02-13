@@ -78,6 +78,12 @@ jobs:
       # 11. Push Docker image to Docker Hub
       - name: Push Docker image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+    
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'  # Use Eclipse Temurin JDK (officially recommended)
+          java-version: '17'
 
       # 12. Run SonarCloud analysis
       - name: SonarCloud Scan
