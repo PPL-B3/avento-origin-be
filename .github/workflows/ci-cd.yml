@@ -69,7 +69,7 @@ jobs:
           --build-arg POSTGRES_HOST=${{ secrets.DB_HOST }} \
           --build-arg POSTGRES_PORT=${{ secrets.DB_PORT }} \
           --build-arg DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public \
-          -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
+          -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest .
 
       # 10. Log in to Docker Hub
       - name: Docker Hub Login
@@ -77,7 +77,7 @@ jobs:
 
       # 11. Push Docker image to Docker Hub
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest
 
       # 12. Run SonarCloud analysis
       - name: SonarCloud Scan
@@ -111,9 +111,9 @@ jobs:
             # Log in to Docker Hub on the remote server
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.io -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             # Pull the new image
-            docker pull docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+            docker pull docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest
             # Stop and remove the existing container (if any)
             docker stop ${{ secrets.IMAGE_NAME }} || true
             docker rm ${{ secrets.IMAGE_NAME }} || true
             # Run the new container (adjust port mappings as needed)
-            docker run -d --name ${{ secrets.IMAGE_NAME }} -p 3000:3000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+            docker run -d --name ${{ secrets.IMAGE_NAME }} -p 3000:3000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest
