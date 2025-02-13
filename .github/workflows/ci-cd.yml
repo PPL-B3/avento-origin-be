@@ -84,6 +84,9 @@ jobs:
         with:
           distribution: 'temurin'  # Use Eclipse Temurin JDK (officially recommended)
           java-version: '17'
+        
+      - name: Verify Java version
+        run: java -version  # Ensures Java 17 is installed before proceeding
 
       # 12. Run SonarCloud analysis
       - name: SonarCloud Scan
