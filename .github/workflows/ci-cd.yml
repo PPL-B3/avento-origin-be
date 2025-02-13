@@ -117,4 +117,4 @@ jobs:
             docker stop ${{ secrets.IMAGE_NAME }} || true
             docker rm ${{ secrets.IMAGE_NAME }} || true
             # Run the new container (adjust port mappings as needed)
-            docker run -d --name ${{ secrets.IMAGE_NAME }} -p 3000:3000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+            docker run -d --name ${{ secrets.IMAGE_NAME }} -p 4000:4000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
