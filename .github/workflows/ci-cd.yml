@@ -114,7 +114,13 @@ jobs:
             # Pull the new image
             docker pull docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
             # Stop and remove the existing container (if any)
-            docker stop ${{ secrets.IMAGE_NAME }} || true
-            docker rm ${{ secrets.IMAGE_NAME }} || true
+            docker stop ${{ secrets.IMAGE_NAME }}_container || true
+            docker rm ${{ secrets.IMAGE_NAME }}_container || true
             # Run the new container (adjust port mappings as needed)
-            docker run -d --name ${{ secrets.IMAGE_NAME }} -p 4000:4000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+            docker run -e POSTGRES_USER=${{ secrets.DB_USER }} \
+            -e POSTGRES_PASSWORD=${{ secrets.DB_PASS }} \
+            -e POSTGRES_DB=${{ secrets.DB_DB }} \
+            -e POSTGRES_HOST=${{ secrets.DB_HOST }} \
+            -e POSTGRES_PORT=${{ secrets.DB_PORT }} \
+            -e DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public \
+            -d --name ${{ secrets.IMAGE_NAME }}_container -p 4000:4000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
