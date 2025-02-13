@@ -41,7 +41,7 @@ jobs:
 
       # 6. Run tests with coverage and generate test reports
       - name: Run tests with coverage
-        run: pnpm test -- --coverage --ci
+        run: pnpm test --coverage --ci
 
       # 7. Upload coverage reports artifact
       - name: Upload coverage report
