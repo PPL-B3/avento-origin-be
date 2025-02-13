@@ -36,4 +36,4 @@ ENV NODE_ENV=production
 EXPOSE 4000
 
 # Use the entrypoint script as the container's entrypoint
-CMD ["bash /app/entrypoint.sh"]
+CMD ["/app/entrypoint.sh"]
