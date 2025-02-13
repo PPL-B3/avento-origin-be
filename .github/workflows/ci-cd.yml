@@ -18,11 +18,11 @@ jobs:
     steps:
       # 1. Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # 2. Set up Node.js and cache pnpm
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -45,14 +45,14 @@ jobs:
 
       # 7. Upload coverage reports artifact
       - name: Upload coverage report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage
 
       # 8. Upload test reports artifact (assuming your tests output a file like test-report.xml)
       - name: Upload test report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-report
           path: test-report.xml
