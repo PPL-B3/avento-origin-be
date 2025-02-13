@@ -65,13 +65,7 @@ jobs:
       # 9. Build Docker image using Docker Hub naming
       - name: Build Docker image
         run: |
-          docker build --build-arg POSTGRES_USER=${{ secrets.DB_USER }} \
-          --build-arg POSTGRES_PASSWORD=${{ secrets.DB_PASS }} \
-          --build-arg POSTGRES_DB=${{ secrets.DB_DB }} \
-          --build-arg POSTGRES_HOST=${{ secrets.DB_HOST }} \
-          --build-arg POSTGRES_PORT=${{ secrets.DB_PORT }} \
-          --build-arg DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public \
-          -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
 
       # 10. Log in to Docker Hub
       - name: Docker Hub Login
