@@ -33,7 +33,7 @@ COPY --from=builder /app/package.json ./
 ENV NODE_ENV=production
 
 # Expose the port your app listens on (default NestJS port is 3000)
-EXPOSE 3000
+EXPOSE 4000
 
 # Start the application
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
