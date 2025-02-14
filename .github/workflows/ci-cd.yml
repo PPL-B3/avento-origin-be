@@ -16,71 +16,47 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 3. Install pnpm globally
       - name: Install pnpm
         run: npm install -g pnpm
 
-      # 2. Set up Node.js and cache pnpm
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
 
-      # 4. Install project dependencies
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 5. Run linting
     #   - name: Lint the code
     #     run: pnpm lint
 
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      # 6. Run tests with coverage and generate test reports
       - name: Run tests with coverage
         run: pnpm test --coverage --ci
-
-      # 7. Upload coverage reports artifact
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage
-
-      # 8. Upload test reports artifact (assuming your tests output a file like test-report.xml)
-      - name: Upload test report
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-report
-          path: test-report.xml
-
-      # 9. Build Docker image using Docker Hub naming
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
-
-      # 10. Log in to Docker Hub
-      - name: Docker Hub Login
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login docker.io -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-
-      # 11. Push Docker image to Docker Hub
-      - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v4
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets. SONARCLOUD_TOKEN }}
 
-      # 13. Set deployment environment variables based on branch
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
+
+      - name: Docker Hub Login
+        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login docker.io -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+
       - name: Set deployment environment variables
         id: deploy-env
         run: |
@@ -95,7 +71,6 @@ jobs:
             echo "REMOTE_USER=${{ secrets.DEV_USER }}" >> $GITHUB_ENV
           fi
 
-      # 14. Deploy to DigitalOcean VPS using SSH (with password authentication)
       - name: Deploy to DigitalOcean VPS
         uses: appleboy/ssh-action@v0.1.8
         with:
