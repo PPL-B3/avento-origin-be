@@ -5,15 +5,13 @@ on:
     branches:
       - main
       - staging
-      - dev
   pull_request:
     branches:
       - main
       - staging
-      - dev
 
 jobs:
-  build-and-deploy:
+  build-and-test:
     runs-on: ubuntu-latest
 
     services:
@@ -55,8 +53,11 @@ jobs:
     #   - name: Lint the code
     #     run: pnpm lint
 
-    #   - name: Generate Prisma Client
-    #     run: pnpx prisma generate
+      - name: Generate Prisma Client
+        run: pnpx prisma generate
+
+      - name: Apply Migrations
+        run: pnpx prisma migrate deploy
 
       - name: Run tests with coverage
         run: pnpm test --coverage --ci
@@ -66,6 +67,13 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets. SONAR_TOKEN }}
 
+
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Build Docker image
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
@@ -85,9 +93,6 @@ jobs:
           elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
             echo "REMOTE_SERVER=${{ secrets.STAGING_SERVER }}" >> $GITHUB_ENV
             echo "REMOTE_USER=${{ secrets.STAGING_USER }}" >> $GITHUB_ENV
-          elif [ "${{ github.ref }}" == "refs/heads/dev" ]; then
-            echo "REMOTE_SERVER=${{ secrets.DEV_SERVER }}" >> $GITHUB_ENV
-            echo "REMOTE_USER=${{ secrets.DEV_USER }}" >> $GITHUB_ENV
           fi
 
       - name: Deploy to DigitalOcean VPS
