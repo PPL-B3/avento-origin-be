@@ -48,8 +48,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-    #   - name: Lint the code
-    #     run: pnpm lint
+      - name: Lint the code
+        run: pnpm lint
 
       - name: Generate Prisma Client
         run: pnpx prisma generate
