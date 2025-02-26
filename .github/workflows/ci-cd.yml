@@ -15,6 +15,25 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser -d testdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,8 +55,8 @@ jobs:
     #   - name: Lint the code
     #     run: pnpm lint
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
+    #   - name: Generate Prisma Client
+    #     run: pnpx prisma generate
 
       - name: Run tests with coverage
         run: pnpm test --coverage --ci
