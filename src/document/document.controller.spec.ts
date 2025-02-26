@@ -27,16 +27,14 @@ describe("DocumentController", () => {
   });
 
   describe("uploadDocument", () => {
-    it("should validate PDF files", async () => {
+    it("should call service.uploadDocument with valid PDF file and valid body", async () => {
       const mockPdf = { mimetype: "application/pdf" } as Express.Multer.File;
-      await controller.uploadDocument(mockPdf, {
-        documentName: "test",
-        ownerName: "user",
-      });
-      expect(service.uploadDocument).toHaveBeenCalled();
+      const body = { documentName: "test", ownerName: "user" };
+      await controller.uploadDocument(mockPdf, body);
+      expect(service.uploadDocument).toHaveBeenCalledWith(mockPdf, body);
     });
 
-    it("should reject non-PDF files", async () => {
+    it("should throw error for non-PDF files", async () => {
       const mockText = { mimetype: "text/plain" } as Express.Multer.File;
       await expect(
         controller.uploadDocument(mockText, {
@@ -46,10 +44,31 @@ describe("DocumentController", () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it("should require document name and owner", async () => {
-      await expect(controller.uploadDocument(null, {} as any)).rejects.toThrow(
-        BadRequestException
-      );
+    it("should throw error when no file is uploaded", async () => {
+      await expect(
+        controller.uploadDocument(null, {
+          documentName: "test",
+          ownerName: "user",
+        })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("should throw error when required fields are missing", async () => {
+      const mockPdf = { mimetype: "application/pdf" } as Express.Multer.File;
+      // Test missing documentName
+      await expect(
+        controller.uploadDocument(mockPdf, {
+          documentName: "",
+          ownerName: "user",
+        })
+      ).rejects.toThrow(BadRequestException);
+      // Test missing ownerName
+      await expect(
+        controller.uploadDocument(mockPdf, {
+          documentName: "test",
+          ownerName: "",
+        })
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });
