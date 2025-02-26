@@ -3,10 +3,10 @@ name: CI/CD for NestJS using Docker Hub
 on:
   push:
     branches:
-      - "*"
+      - "**"
   pull_request:
     branches:
-      - "*"
+      - "**"
 
 jobs:
   build-and-test:
