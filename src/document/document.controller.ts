@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { DocumentService } from "./document.service";
+import { UploadDocumentDTO } from "./dto/upload-document.dto";
 
 @Controller("documents")
 export class DocumentController {
@@ -17,7 +18,7 @@ export class DocumentController {
   @UseInterceptors(FileInterceptor("file"))
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File | null,
-    @Body() body: { documentName: string; ownerName: string }
+    @Body() body: UploadDocumentDTO
   ) {
     if (!file) throw new BadRequestException("No file uploaded");
     if (file.mimetype !== "application/pdf") {
