@@ -55,14 +55,14 @@ describe("DocumentController", () => {
 
     it("should throw error when required fields are missing", async () => {
       const mockPdf = { mimetype: "application/pdf" } as Express.Multer.File;
-      // Test missing documentName
+      // Test missing documentName.
       await expect(
         controller.uploadDocument(mockPdf, {
           documentName: "",
           ownerName: "user",
         })
       ).rejects.toThrow(BadRequestException);
-      // Test missing ownerName
+      // Test missing ownerName.
       await expect(
         controller.uploadDocument(mockPdf, {
           documentName: "test",
