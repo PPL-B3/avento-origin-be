@@ -34,4 +34,25 @@ export class AuthService {
       }
     }
   }
+
+  async login(dto: AuthDto) {
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
+    if (!user) {
+      throw new ForbiddenException('Username or password is incorrect');
+    }
+
+    const passwordMatches = await argon.verify(user.password, dto.password);
+    if (!passwordMatches) {
+      throw new ForbiddenException('Username or password is incorrect');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+    };
+  }
 }
