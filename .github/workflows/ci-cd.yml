@@ -3,18 +3,33 @@ name: CI/CD for NestJS using Docker Hub
 on:
   push:
     branches:
-      - main
-      - staging
-      - dev
+      - "**"
   pull_request:
     branches:
-      - main
-      - staging
-      - dev
+      - "**"
 
 jobs:
-  build-and-deploy:
+  build-and-test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testuser -d testdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -33,11 +48,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-    #   - name: Lint the code
-    #     run: pnpm lint
+      #   - name: Lint the code
+      #     run: pnpm lint
 
       - name: Generate Prisma Client
-        run: npx prisma generate
+        run: pnpx prisma generate
+
+      - name: Apply Migrations
+        run: pnpx prisma migrate deploy
 
       - name: Run tests with coverage
         run: pnpm test --coverage --ci
@@ -45,8 +63,21 @@ jobs:
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v4
         env:
-          SONAR_TOKEN: ${{ secrets. SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_CSUI }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_CSUI }}
+
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Build Docker image
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
@@ -66,9 +97,6 @@ jobs:
           elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
             echo "REMOTE_SERVER=${{ secrets.STAGING_SERVER }}" >> $GITHUB_ENV
             echo "REMOTE_USER=${{ secrets.STAGING_USER }}" >> $GITHUB_ENV
-          elif [ "${{ github.ref }}" == "refs/heads/dev" ]; then
-            echo "REMOTE_SERVER=${{ secrets.DEV_SERVER }}" >> $GITHUB_ENV
-            echo "REMOTE_USER=${{ secrets.DEV_USER }}" >> $GITHUB_ENV
           fi
 
       - name: Deploy to DigitalOcean VPS
