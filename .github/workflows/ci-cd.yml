@@ -66,6 +66,12 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_CSUI }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
   deploy:
     needs: build-and-test
     if: github.ref == 'refs/heads/main'
