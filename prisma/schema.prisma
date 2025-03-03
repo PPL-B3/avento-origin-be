@@ -23,11 +23,11 @@ model Message {
 }
 
 model User {
-  id         String @id @default(uuid())
-  email      String @unique
+  id         String   @id @default(uuid())
+  email      String   @unique
   password   String
   role       String
-  lastLogout String
+  lastLogout DateTime
 
   @@map("users")
 }
