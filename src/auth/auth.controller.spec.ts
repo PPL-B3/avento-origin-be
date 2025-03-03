@@ -31,7 +31,7 @@ describe('AuthController', () => {
       password: 'password123',
     };
 
-    const mockResponse = { id: '123', email: dto.email };
+    const mockResponse = { id: '123', email: dto.email, role: 'user' };
 
     jest.spyOn(authService, 'register').mockResolvedValue(mockResponse);
 

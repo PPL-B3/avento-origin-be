@@ -3,6 +3,8 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthDto } from './dto';
 import * as argon from 'argon2';
+import { ForbiddenException } from '@nestjs/common';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -16,7 +18,8 @@ describe('AuthService', () => {
           provide: PrismaService,
           useValue: {
             user: {
-              create: jest.fn(), // Mock user.create()
+              create: jest.fn(),
+              findUnique: jest.fn(),
             },
           },
         },
@@ -60,16 +63,39 @@ describe('AuthService', () => {
         password: 'hashedpassword',
         role: 'user',
       },
-      select: {
-        id: true,
-        email: true,
-      },
     });
 
-    expect(result).toEqual(mockUser);
+    expect(result).toEqual({
+      id: mockUser.id,
+      email: mockUser.email,
+      role: mockUser.role,
+    });
   });
 
-  it('should throw an error if Prisma fails', async () => {
+  it('should throw ForbiddenException if email is already registered', async () => {
+    const dto: AuthDto = {
+      email: 'duplicate@example.com',
+      password: 'password123',
+    };
+
+    jest.spyOn(argon, 'hash').mockResolvedValue('hashedpassword');
+    jest.spyOn(prismaService.user, 'create').mockRejectedValue(
+      new PrismaClientKnownRequestError('', {
+        code: 'P2002',
+        clientVersion: '6.4.1',
+      }),
+    );
+
+    await expect(authService.register(dto)).rejects.toThrow(ForbiddenException);
+    await expect(authService.register(dto)).rejects.toThrow(
+      'Email has already been registered',
+    );
+
+    expect(argon.hash).toHaveBeenCalledWith(dto.password);
+    expect(prismaService.user.create).toHaveBeenCalled();
+  });
+
+  it('should throw a generic error if Prisma fails unexpectedly', async () => {
     const dto: AuthDto = {
       email: 'fail@example.com',
       password: 'password123',
@@ -78,9 +104,12 @@ describe('AuthService', () => {
     jest.spyOn(argon, 'hash').mockResolvedValue('hashedpassword');
     jest
       .spyOn(prismaService.user, 'create')
-      .mockRejectedValue(new Error('Prisma error'));
+      .mockRejectedValue(new Error('Unexpected database error'));
 
-    await expect(authService.register(dto)).rejects.toThrow('Prisma error');
+    await expect(authService.register(dto)).rejects.toThrow(Error);
+    await expect(authService.register(dto)).rejects.toThrow(
+      'Unexpected database error',
+    );
 
     expect(argon.hash).toHaveBeenCalledWith(dto.password);
     expect(prismaService.user.create).toHaveBeenCalled();
