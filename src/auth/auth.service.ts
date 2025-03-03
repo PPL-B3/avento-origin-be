@@ -24,10 +24,11 @@ export class AuthService {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
-      if (!user || !user.lastLogout) return true; // If no user or lastLogout, blacklist token
+      if (!user?.lastLogout) return true; // If no user or lastLogout, blacklist token
 
       const decoded = jwt.decode(token) as jwt.JwtPayload;
-      if (!decoded || !decoded.iat) return true; // If token is invalid or doesn't have 'iat', blacklist token
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (!decoded?.iat) return true; // If token is invalid or doesn't have 'iat', blacklist token
 
       const tokenIssuedAt = decoded.iat; // Token's 'issued at' time
       const userLastLogout = Math.floor(user.lastLogout.getTime() / 1000); // Convert lastLogout to seconds
