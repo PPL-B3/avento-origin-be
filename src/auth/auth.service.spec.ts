@@ -114,4 +114,92 @@ describe('AuthService', () => {
     expect(argon.hash).toHaveBeenCalledWith(dto.password);
     expect(prismaService.user.create).toHaveBeenCalled();
   });
+
+  it('should return user details when login is successful', async () => {
+    const dto: AuthDto = {
+      email: 'test@example.com',
+      password: 'password123',
+    };
+
+    const mockUser = {
+      id: '123',
+      email: dto.email,
+      password: 'hashedpassword',
+      role: 'user',
+    };
+
+    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(mockUser);
+    jest.spyOn(argon, 'verify').mockResolvedValue(true);
+
+    const result = await authService.login(dto);
+
+    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
+      where: { email: dto.email },
+    });
+    expect(argon.verify).toHaveBeenCalledWith(mockUser.password, dto.password);
+    expect(result).toEqual({ id: '123', email: dto.email });
+  });
+
+  it('should throw ForbiddenException if user is not found', async () => {
+    const dto: AuthDto = {
+      email: 'nonexistent@example.com',
+      password: 'password123',
+    };
+
+    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(null);
+
+    await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
+    await expect(authService.login(dto)).rejects.toThrow(
+      'Username or password is incorrect',
+    );
+
+    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
+      where: { email: dto.email },
+    });
+  });
+
+  it('should throw ForbiddenException if password is incorrect', async () => {
+    const dto: AuthDto = {
+      email: 'test@example.com',
+      password: 'wrongpassword',
+    };
+
+    const mockUser = {
+      id: '123',
+      email: dto.email,
+      password: 'hashedpassword',
+      role: 'user',
+    };
+
+    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(mockUser);
+    jest.spyOn(argon, 'verify').mockResolvedValue(false);
+
+    await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
+    await expect(authService.login(dto)).rejects.toThrow(
+      'Username or password is incorrect',
+    );
+
+    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
+      where: { email: dto.email },
+    });
+    expect(argon.verify).toHaveBeenCalledWith(mockUser.password, dto.password);
+  });
+
+  it('should throw an error if Prisma throws an exception', async () => {
+    const dto: AuthDto = {
+      email: 'test@example.com',
+      password: 'password123',
+    };
+
+    jest
+      .spyOn(prismaService.user, 'findUnique')
+      .mockRejectedValue(new Error('Database error'));
+
+    await expect(authService.login(dto)).rejects.toThrow(Error);
+    await expect(authService.login(dto)).rejects.toThrow('Database error');
+
+    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
+      where: { email: dto.email },
+    });
+  });
 });
