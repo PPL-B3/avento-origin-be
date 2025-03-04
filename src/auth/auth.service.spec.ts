@@ -49,7 +49,7 @@ describe('AuthService', () => {
       email: 'test@test.com',
       password: 'hashedpassword',
       role: 'user',
-      lastLogout: new Date(),
+      lastLogout: null,
     };
 
     jest.spyOn(argon, 'hash').mockResolvedValue('hashedpassword');
@@ -70,7 +70,6 @@ describe('AuthService', () => {
       id: mockUser.id,
       email: mockUser.email,
       role: mockUser.role,
-      lastLogout: mockUser.lastLogout,
     });
   });
 
@@ -140,7 +139,12 @@ describe('AuthService', () => {
       where: { email: dto.email },
     });
     expect(argon.verify).toHaveBeenCalledWith(mockUser.password, dto.password);
-    expect(result).toEqual({ id: '123', email: dto.email, role: 'user' });
+    expect(result).toEqual({
+      id: '123',
+      email: mockUser.email,
+      role: mockUser.role,
+      lastLogout: mockUser.lastLogout,
+    });
   });
 
   it('should throw ForbiddenException if user is not found', async () => {
