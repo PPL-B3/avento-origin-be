@@ -35,7 +35,11 @@ describe('AuthController', () => {
   /** ✅ POSITIVE CASE: Successful registration */
   it('should register a new user successfully', async () => {
     const dto: AuthDto = { email: 'test@example.com', password: 'password123' };
-    const mockResponse = { id: '123', email: dto.email, role: 'user' };
+    const mockResponse = {
+      id: '123',
+      email: dto.email,
+      role: 'user',
+    };
 
     jest.spyOn(authService, 'register').mockResolvedValue(mockResponse);
 
@@ -75,7 +79,12 @@ describe('AuthController', () => {
   /** ✅ POSITIVE CASE: Successful login */
   it('should return user details when login is successful', async () => {
     const dto: AuthDto = { email: 'test@example.com', password: 'password123' };
-    const mockUser = { id: '123', email: dto.email };
+    const mockUser = {
+      id: '123',
+      email: dto.email,
+      role: 'user',
+      lastLogout: new Date(),
+    };
 
     jest.spyOn(authService, 'login').mockResolvedValue(mockUser);
 
