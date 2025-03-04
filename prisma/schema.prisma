@@ -26,5 +26,6 @@ model User {
     email String @unique
     password String
     role String
+    lastLogout DateTime
     @@map("users")
 }
