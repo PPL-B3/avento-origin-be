@@ -4,60 +4,45 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import * as jwt from "jsonwebtoken";
 import { AuthDto } from "./dto";
 import * as argon from "argon2";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { JwtService } from "./jwt/jwt.service";
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   /**
    * Menandai token sebagai tidak valid dengan menyimpan timestamp logout di database.
    */
-  async blacklistToken(userId: string): Promise<void> {
+  async logout(userId: string): Promise<{ success: boolean; message: string }> {
     if (!userId) {
       throw new BadRequestException("User ID harus diisi");
     }
-    await this.prismaService.user.update({
-      where: { id: userId },
-      data: { lastLogout: BigInt(Date.now()) },
-    });
-  }
 
-  /**
-   * Memeriksa apakah token sudah kadaluarsa berdasarkan lastLogout user.
-   */
-  async isTokenBlacklisted(token: string, userId: string): Promise<boolean> {
     try {
-      const user = await this.prismaService.user.findUnique({
+      await this.prismaService.user.update({
         where: { id: userId },
+        data: { lastLogout: BigInt(Date.now()) },
       });
 
-      if (!user?.lastLogout) return true; // If no user or lastLogout, blacklist token
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
-      const decoded = jwt.decode(token) as jwt.JwtPayload;
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (!decoded?.iat) return true; // If token is invalid or doesn't have 'iat', blacklist token
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const tokenIssuedAt = Number(decoded.iat); // Token's 'issued at' time
-      const userLastLogout = Math.floor(Number(user.lastLogout) / 1000); // Convert lastLogout to seconds
-
-      // Return true if token is issued before the lastLogout (meaning blacklisted)
-      return tokenIssuedAt <= userLastLogout; // Token is blacklisted if issued before or exactly at the last logout
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      return {
+        success: true,
+        message: "Berhasil logout",
+      };
     } catch (error) {
-      return true; // In case of error, treat token as blacklisted
+      return {
+        success: false,
+        message: "Gagal logout",
+      };
     }
   }
 
-  async logout(userId: string): Promise<void> {
-    await this.blacklistToken(userId);
-  }
+
 
   async register(dto: AuthDto) {
     const hash = await argon.hash(dto.password);
@@ -102,11 +87,15 @@ export class AuthService {
       throw new ForbiddenException("Username or password is incorrect");
     }
 
+    const token = this.jwtService.generateToken({ userId: user.id });
+
     return {
-      id: user.id,
-      email: user.email,
-      role: "user",
-      lastLogout: user.lastLogout,
+      access_token: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
     };
   }
 }

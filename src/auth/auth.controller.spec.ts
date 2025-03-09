@@ -91,11 +91,14 @@ describe('AuthController', () => {
   /** ✅ POSITIVE CASE: Successful login */
   it('should return user details when login is successful', async () => {
     const dto: AuthDto = { email: 'test@example.com', password: 'password123' };
+
     const mockUser = {
-      id: '123',
-      email: dto.email,
-      role: 'user',
-      lastLogout: BigInt(Date.now()),
+      access_token: 'mock-jwt-token',
+      user: {
+        id: '123',
+        email: dto.email,
+        role: 'user',
+      },
     };
 
     jest.spyOn(authService, 'login').mockResolvedValue(mockUser);
