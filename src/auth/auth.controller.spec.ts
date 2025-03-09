@@ -13,6 +13,7 @@ describe('AuthController', () => {
     const mockAuthService = {
       register: jest.fn(),
       login: jest.fn(),
+      logout: jest.fn().mockResolvedValue({ message: 'Logout successful' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -26,6 +27,17 @@ describe('AuthController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('should call logout service with userId and return success message', async () => {
+    const userId = '123'; // userId as a string
+
+    const logoutSpy = jest.spyOn(authService, 'logout');
+
+    const result = await authController.logout(userId); // Pass the userId directly
+
+    expect(result).toEqual({ message: 'Logout successful' });
+    expect(logoutSpy).toHaveBeenCalledWith(userId); // Check if only userId is passed
   });
 
   it('should be defined', () => {

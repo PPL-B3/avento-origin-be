@@ -17,3 +17,5 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=avento_origin
+    ports:
+      - "5433:5432"
