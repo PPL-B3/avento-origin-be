@@ -10,7 +10,6 @@ export class AuthService {
    * Menandai token sebagai tidak valid dengan menyimpan timestamp logout di database.
    */
   async blacklistToken(userId: string): Promise<void> {
-    // @ts-ignore
     await this.prisma.user.update({
       where: { id: userId },
       data: { lastLogout: new Date() },

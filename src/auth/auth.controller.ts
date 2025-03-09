@@ -1,12 +1,12 @@
-import { Controller, Post, Body } from "@nestjs/common";
-import { AuthService } from "./auth.service";
+import { Controller, Post, Body } from '@nestjs/common';
+import { AuthService } from './auth.service';
 
-@Controller("auth")
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post("logout")
-  logout(@Body("userId") userId: string) {
+  @Post('logout')
+  logout(@Body('userId') userId: string) {
     // userId is a string
     return this.authService.logout(userId);
   }
