@@ -72,7 +72,7 @@ jobs:
     
       - name: Deploy
         run: |
-          export DOCKER_HOST="ssh://${{ env.REMOTE_USER }}@${{ env.REMOTE_SERVER }}"
+          export DOCKER_HOST=ssh://${{ env.REMOTE_USER }}@${{ env.REMOTE_SERVER }}
           docker info
           docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
           docker system prune -af
