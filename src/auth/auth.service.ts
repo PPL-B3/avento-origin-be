@@ -1,9 +1,13 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import * as jwt from 'jsonwebtoken';
-import { AuthDto } from './dto';
-import * as argon from 'argon2';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import * as jwt from "jsonwebtoken";
+import { AuthDto } from "./dto";
+import * as argon from "argon2";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 @Injectable()
 export class AuthService {
@@ -13,9 +17,12 @@ export class AuthService {
    * Menandai token sebagai tidak valid dengan menyimpan timestamp logout di database.
    */
   async blacklistToken(userId: string): Promise<void> {
+    if (!userId) {
+      throw new BadRequestException("User ID harus diisi");
+    }
     await this.prismaService.user.update({
       where: { id: userId },
-      data: { lastLogout: new Date() },
+      data: { lastLogout: BigInt(Date.now()) },
     });
   }
 
@@ -30,12 +37,15 @@ export class AuthService {
 
       if (!user?.lastLogout) return true; // If no user or lastLogout, blacklist token
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-call,@typescript-eslint/no-unsafe-member-access
       const decoded = jwt.decode(token) as jwt.JwtPayload;
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (!decoded?.iat) return true; // If token is invalid or doesn't have 'iat', blacklist token
 
-      const tokenIssuedAt = decoded.iat; // Token's 'issued at' time
-      const userLastLogout = Math.floor(user.lastLogout.getTime() / 1000); // Convert lastLogout to seconds
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const tokenIssuedAt = Number(decoded.iat); // Token's 'issued at' time
+      const userLastLogout = Math.floor(Number(user.lastLogout) / 1000); // Convert lastLogout to seconds
 
       // Return true if token is issued before the lastLogout (meaning blacklisted)
       return tokenIssuedAt <= userLastLogout; // Token is blacklisted if issued before or exactly at the last logout
@@ -56,7 +66,8 @@ export class AuthService {
         data: {
           email: dto.email,
           password: hash,
-          role: 'user',
+          role: "user",
+          lastLogout: BigInt(Date.now()),
         },
       });
 
@@ -67,8 +78,8 @@ export class AuthService {
       };
     } catch (err) {
       if (err instanceof PrismaClientKnownRequestError) {
-        if (err.code === 'P2002') {
-          throw new ForbiddenException('Email has already been registered');
+        if (err.code === "P2002") {
+          throw new ForbiddenException("Email has already been registered");
         }
       } else {
         throw err;
@@ -83,18 +94,18 @@ export class AuthService {
       },
     });
     if (!user) {
-      throw new ForbiddenException('Username or password is incorrect');
+      throw new ForbiddenException("Username or password is incorrect");
     }
 
     const passwordMatches = await argon.verify(user.password, dto.password);
     if (!passwordMatches) {
-      throw new ForbiddenException('Username or password is incorrect');
+      throw new ForbiddenException("Username or password is incorrect");
     }
 
     return {
       id: user.id,
       email: user.email,
-      role: 'user',
+      role: "user",
       lastLogout: user.lastLogout,
     };
   }

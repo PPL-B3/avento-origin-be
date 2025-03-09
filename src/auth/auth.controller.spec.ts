@@ -95,7 +95,7 @@ describe('AuthController', () => {
       id: '123',
       email: dto.email,
       role: 'user',
-      lastLogout: new Date(),
+      lastLogout: BigInt(Date.now()),
     };
 
     jest.spyOn(authService, 'login').mockResolvedValue(mockUser);
