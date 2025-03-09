@@ -1,0 +1,18 @@
+services:
+  nestjs:
+    image: ${IMAGE_NAME}
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - DATABASE_URL
+    ports:
+      - "4000:4000"
+
+  database:
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB

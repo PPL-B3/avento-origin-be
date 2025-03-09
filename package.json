@@ -33,7 +33,8 @@
     "class-validator": "^0.14.1",
     "commander": "^13.1.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sails": "^1.5.14"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

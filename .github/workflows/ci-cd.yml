@@ -9,7 +9,7 @@ on:
       - "**"
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
 
     services:
@@ -72,21 +72,41 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_CSUI }}
 
-  deploy:
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main'
+  build-and-push:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Build Docker image
+      - name: Chekout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }} .
-
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest .
+    
       - name: Docker Hub Login
-        run: echo ${{ secrets.DOCKER_PASSWORD }} | docker login docker.io -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+            username: ${{ secrets.DOCKER_USERNAME }}
+            password: ${{ secrets.DOCKER_PASSWORD }}
+        
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest
 
-      - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/head/staging'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Chekout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set deployment environment variables
         id: deploy-env
@@ -98,26 +118,29 @@ jobs:
             echo "REMOTE_SERVER=${{ secrets.STAGING_SERVER }}" >> $GITHUB_ENV
             echo "REMOTE_USER=${{ secrets.STAGING_USER }}" >> $GITHUB_ENV
           fi
-
-      - name: Deploy to DigitalOcean VPS
-        uses: appleboy/ssh-action@v0.1.8
-        with:
-          host: ${{ env.REMOTE_SERVER }}
-          username: ${{ env.REMOTE_USER }}
-          password: ${{ secrets.DIGITALOCEAN_SSH_PASSWORD }}
-          script: |
-            # Log in to Docker Hub on the remote server
-            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login docker.io -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-            # Pull the new image
-            docker pull docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
-            # Stop and remove the existing container (if any)
-            docker stop ${{ secrets.IMAGE_NAME }}_container || true
-            docker rm ${{ secrets.IMAGE_NAME }}_container || true
-            # Run the new container (adjust port mappings as needed)
-            docker run -e POSTGRES_USER=${{ secrets.DB_USER }} \
-            -e POSTGRES_PASSWORD=${{ secrets.DB_PASS }} \
-            -e POSTGRES_DB=${{ secrets.DB_DB }} \
-            -e POSTGRES_HOST=${{ secrets.DB_HOST }} \
-            -e POSTGRES_PORT=${{ secrets.DB_PORT }} \
-            -e DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public \
-            -d --network=host --name ${{ secrets.IMAGE_NAME }}_container -p 4000:4000 docker.io/${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:${{ github.sha }}
+     
+      - name: Set docker-compose environment variables
+        run: |
+          cat << EOF > .env
+            POSTGRES_USER=${{ secrets.DB_USER }}
+            POSTGRES_PASSWORD=${{ secrets.DB_PASS }}
+            POSTGRES_DB=${{ secrets.DB_DB }}
+            POSTGRES_HOST=${{ secrets.DB_HOST }}
+            POSTGRES_PORT=${{ secrets.DB_PORT }}
+            DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public
+            IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest
+          EOF
+      
+      - name: Set up ssh key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+    
+      - name: Deploy
+        run: |
+          export DOCKER_HOST="ssh://${{ env.REMOTE_USER }}@${{ env.REMOTE_SERVER }}"
+          docker info
+          docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+          docker system prune -af
+          docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d

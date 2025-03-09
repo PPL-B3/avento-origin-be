@@ -42,4 +42,4 @@ ENV NODE_ENV=production
 EXPOSE 4000
 
 # Run database migrations before starting the app
-CMD ["sh", "-c", "pnpm db:dev:restart && pnpx prisma migrate deploy && node dist/src/main.js"]
+CMD ["sh", "-c", "pnpx prisma migrate deploy && node dist/src/main.js"]
