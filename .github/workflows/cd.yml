@@ -63,6 +63,9 @@ jobs:
             DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public
             IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest
           EOF
+    
+      - name: Sanity check
+        run : pwd && ls -al
       
       - name: Set up ssh key
         run: |
