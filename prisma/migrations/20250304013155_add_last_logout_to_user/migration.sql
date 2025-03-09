@@ -5,4 +5,4 @@
 
 */
 -- AlterTable
-ALTER TABLE "users" ADD COLUMN     "lastLogout" TEXT NOT NULL;
+ALTER TABLE "users" ADD COLUMN     "lastLogout" TIMESTAMP(3) NOT NULL;
