@@ -37,7 +37,6 @@ jobs:
 
   deploy:
     needs: build-and-push
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/head/staging'
     runs-on: ubuntu-latest
 
     steps:
@@ -53,8 +52,8 @@ jobs:
             echo "REMOTE_SERVER=${{ secrets.PROD_SERVER }}" >> $GITHUB_ENV
             echo "REMOTE_USER=${{ secrets.PROD_USER }}" >> $GITHUB_ENV
           elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
-            echo "REMOTE_SERVER=${{ secrets.STAGING_SERVER }}" >> $GITHUB_ENV
-            echo "REMOTE_USER=${{ secrets.STAGING_USER }}" >> $GITHUB_ENV
+            echo "REMOTE_SERVER=${{ secrets.PROD_SERVER }}" >> $GITHUB_ENV
+            echo "REMOTE_USER=${{ secrets.PROD_USER }}" >> $GITHUB_ENV
           fi
      
       - name: Set docker-compose environment variables
