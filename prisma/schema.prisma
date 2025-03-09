@@ -20,3 +20,12 @@ model Message {
   createdAt DateTime @default(now())
   @@map("messages")
 }
+
+model User {
+    id String @id @default(uuid())
+    email String @unique
+    password String
+    role String
+    lastLogout DateTime?
+    @@map("users")
+}

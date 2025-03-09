@@ -30,7 +30,6 @@ describe('HelloController', () => {
     const result = await controller.getHello();
     expect(result).toEqual(expected);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(helloService.getHello).toHaveBeenCalled();
   });
 });

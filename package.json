@@ -6,6 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "db:dev:rm": "docker compose rm database -sfv",
+    "db:dev:up": "docker compose up database -d",
+    "db:dev:restart": "pnpm run db:dev:rm && pnpm run db:dev:up  && pnpx prisma migrate deploy",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -25,9 +28,13 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/client": "6.3.1",
+    "argon2": "^0.41.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
     "commander": "^13.1.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sails": "^1.5.14"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -58,18 +65,16 @@
     "typescript-eslint": "^8.20.0"
   },
   "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
     "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "globalSetup": "../jest.setup.ts",
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.ts",
+      "!**/*.module.ts",
+      "!main.ts",
+      "!hello/**"
     ],
     "collectCoverage": true,
     "coverageDirectory": "../coverage",
