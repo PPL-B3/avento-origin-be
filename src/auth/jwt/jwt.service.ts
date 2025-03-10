@@ -7,7 +7,7 @@ import { ConfigService } from "@nestjs/config";
 export class JwtService {
   constructor(
     private readonly prismaService: PrismaService,
-    private configService: ConfigService,
+    private readonly configService: ConfigService,
   ) {}
   generateToken(payload: { userId: string; iat?: number }): string {
     const issuedAt = payload.iat ?? Number(Math.floor(Date.now() / 1000));
