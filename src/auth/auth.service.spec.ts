@@ -3,7 +3,7 @@ import { AuthService } from "./auth.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthDto } from "./dto";
 import * as argon from "argon2";
-import { ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "./jwt/jwt.service";
 
@@ -92,7 +92,7 @@ describe("AuthService", () => {
   it("should register a new user successfully", async () => {
     const dto: AuthDto = {
       email: "test@example.com",
-      password: "password123",
+      password: "Password123!",
     };
 
     const mockUser = {
@@ -128,7 +128,7 @@ describe("AuthService", () => {
   it("should throw ForbiddenException if email is already registered", async () => {
     const dto: AuthDto = {
       email: "duplicate@example.com",
-      password: "password123",
+      password: "Password123!",
     };
 
     jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
@@ -151,7 +151,7 @@ describe("AuthService", () => {
   it("should throw a generic error if Prisma fails unexpectedly", async () => {
     const dto: AuthDto = {
       email: "fail@example.com",
-      password: "password123",
+      password: "Password123!",
     };
 
     jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
@@ -262,6 +262,74 @@ describe("AuthService", () => {
 
     expect(prismaService.user.findUnique).toHaveBeenCalledWith({
       where: { email: dto.email },
+    });
+  });
+
+  describe("validatePassword", () => {
+    let localMockUser: {
+      id: string;
+      email: string;
+      password: string;
+      role: string;
+      lastLogout: bigint;
+    };
+
+    beforeEach(() => {
+      localMockUser = {
+        id: "123",
+        email: "test@test.com",
+        password: "hashedpassword",
+        role: "user",
+        lastLogout: BigInt(0),
+      };
+    });
+
+    it("should pass with a valid password", async () => {
+      const dto: AuthDto = { email: "valid@example.com", password: "Valid1!A" };
+
+      jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
+      jest.spyOn(prismaService.user, "create").mockResolvedValue(localMockUser);
+
+      await expect(authService.register(dto)).resolves.toMatchObject({
+        id: localMockUser.id,
+        email: localMockUser.email,
+        role: localMockUser.role,
+      });
+    });
+
+    it("should fail if password is too short", async () => {
+      const dto: AuthDto = { email: "test@example.com", password: "A1!a" };
+      await expect(authService.register(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("should fail if password lacks a lowercase letter", async () => {
+      const dto: AuthDto = { email: "test@example.com", password: "VALID1!A" };
+      await expect(authService.register(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("should fail if password lacks an uppercase letter", async () => {
+      const dto: AuthDto = { email: "test@example.com", password: "valid1!a" };
+      await expect(authService.register(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("should fail if password lacks a number", async () => {
+      const dto: AuthDto = { email: "test@example.com", password: "Valid!Aa" };
+      await expect(authService.register(dto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("should fail if password lacks a special character", async () => {
+      const dto: AuthDto = { email: "test@example.com", password: "Valid1Aa" };
+      await expect(authService.register(dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });
