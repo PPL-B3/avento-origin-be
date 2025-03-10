@@ -118,7 +118,7 @@ export class AuthService {
     }
 
     if (errors.length > 0) {
-      throw new BadRequestException(errors.join(", "));
+      throw new BadRequestException({ errors });
     }
   }
 }
