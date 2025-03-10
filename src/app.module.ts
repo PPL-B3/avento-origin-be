@@ -4,6 +4,7 @@ import {
   NestModule,
   RequestMethod,
 } from "@nestjs/common";
+import { DocumentModule } from './document/document.module';
 import { HelloModule } from "./hello/hello.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
@@ -12,7 +13,7 @@ import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 
 
 @Module({
-  imports: [HelloModule, PrismaModule, AuthModule],
+  imports: [HelloModule, PrismaModule, AuthModule, DocumentModule],
   providers: [PrismaService],
 })
 export class AppModule implements NestModule {
