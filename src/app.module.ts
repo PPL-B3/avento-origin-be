@@ -30,8 +30,8 @@ export class AppModule implements NestModule {
       .apply(JwtAuthMiddleware)
       .exclude(
         { path: "auth/register", method: RequestMethod.POST },
-        { path: "auth/login", method: RequestMethod.POST },
+        { path: "auth/login", method: RequestMethod.POST }
       )
-      .forRoutes("*"); // semua route pakai middleware ini
+      .forRoutes("*"); // semua route pakai middleware ini.
   }
 }
