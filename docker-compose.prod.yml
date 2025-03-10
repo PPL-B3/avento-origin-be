@@ -8,6 +8,7 @@ services:
       - POSTGRES_HOST
       - POSTGRES_PORT
       - DATABASE_URL
+      - JWT_SECRET
     ports:
       - "4000:4000"
 

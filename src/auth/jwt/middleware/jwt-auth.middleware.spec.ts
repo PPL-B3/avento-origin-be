@@ -7,8 +7,6 @@ import { Request, Response } from "express";
 
 describe("JwtAuthMiddleware", () => {
   let middleware: JwtAuthMiddleware;
-  let jwtService: JwtService;
-  let prismaService: PrismaService;
 
   // Mock services
   const mockJwtService = {
@@ -35,8 +33,6 @@ describe("JwtAuthMiddleware", () => {
     }).compile();
 
     middleware = module.get<JwtAuthMiddleware>(JwtAuthMiddleware);
-    jwtService = module.get<JwtService>(JwtService);
-    prismaService = module.get<PrismaService>(PrismaService);
 
     // Reset mocks for each test
     mockRequest = {};
@@ -238,6 +234,5 @@ describe("JwtAuthMiddleware", () => {
       });
       expect(mockNext).toHaveBeenCalled();
     });
-
   });
 });

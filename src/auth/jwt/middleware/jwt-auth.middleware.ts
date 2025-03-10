@@ -16,7 +16,7 @@ export class JwtAuthMiddleware implements NestMiddleware {
 
   async use(req: Request, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
-    if (!(authHeader?.startsWith("Bearer "))) {
+    if (!authHeader?.startsWith("Bearer ")) {
       throw new UnauthorizedException("Token tidak ditemukan");
     }
 

@@ -1,11 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import * as jwt from "jsonwebtoken";
 import { PrismaService } from "../../prisma/prisma.service";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class JwtService {
-  private readonly JWT_SECRET = process.env.JWT_SECRET ?? "default_secret";
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
   generateToken(payload: { userId: string; iat?: number }): string {
     const issuedAt = payload.iat ?? Number(Math.floor(Date.now() / 1000));
 
@@ -14,7 +17,7 @@ export class JwtService {
         userId: payload.userId,
         iat: issuedAt,
       },
-      this.JWT_SECRET,
+      this.configService.get<string>("JWT_SECRET", "default_secret"),
       {
         expiresIn: "1h",
       },
@@ -22,7 +25,10 @@ export class JwtService {
   }
 
   verifyToken(token: string): jwt.JwtPayload {
-    return jwt.verify(token, this.JWT_SECRET) as jwt.JwtPayload;
+    return jwt.verify(
+      token,
+      this.configService.get<string>("JWT_SECRET", "default_secret"),
+    ) as jwt.JwtPayload;
   }
 
   async isTokenBlacklisted(token: string, userId: string): Promise<boolean> {
