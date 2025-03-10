@@ -34,15 +34,13 @@ export class AuthService {
         success: true,
         message: "Berhasil logout",
       };
-    } catch (error) {
+    } catch {
       return {
         success: false,
         message: "Gagal logout",
       };
     }
   }
-
-
 
   async register(dto: AuthDto) {
     const hash = await argon.hash(dto.password);

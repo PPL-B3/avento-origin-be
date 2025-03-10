@@ -5,7 +5,7 @@ import { AuthDto } from "./dto";
 import * as argon from "argon2";
 import { ForbiddenException } from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { JwtService } from './jwt/jwt.service';
+import { JwtService } from "./jwt/jwt.service";
 
 describe("AuthService", () => {
   let authService: AuthService;
@@ -28,7 +28,7 @@ describe("AuthService", () => {
         {
           provide: JwtService,
           useValue: {
-            generateToken: jest.fn().mockReturnValue('mocked-jwt-token'),
+            generateToken: jest.fn().mockReturnValue("mocked-jwt-token"),
           },
         },
       ],
