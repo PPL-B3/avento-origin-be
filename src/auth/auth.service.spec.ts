@@ -1,13 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from './auth.service';
-import { PrismaService } from '../prisma/prisma.service';
-import * as jwt from 'jsonwebtoken';
-import { AuthDto } from './dto';
-import * as argon from 'argon2';
-import { ForbiddenException } from '@nestjs/common';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { Test, TestingModule } from "@nestjs/testing";
+import { AuthService } from "./auth.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { AuthDto } from "./dto";
+import * as argon from "argon2";
+import { ForbiddenException } from "@nestjs/common";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { JwtService } from './jwt/jwt.service';
 
-describe('AuthService', () => {
+describe("AuthService", () => {
   let authService: AuthService;
   let prismaService: PrismaService;
 
@@ -25,6 +25,12 @@ describe('AuthService', () => {
             },
           },
         },
+        {
+          provide: JwtService,
+          useValue: {
+            generateToken: jest.fn().mockReturnValue('mocked-jwt-token'),
+          },
+        },
       ],
     }).compile();
 
@@ -36,133 +42,69 @@ describe('AuthService', () => {
     jest.clearAllMocks();
   });
 
-  describe('blacklistToken', () => {
-    it('should update lastLogout with the current timestamp', async () => {
-      const userId = '123';
-      jest
-        .spyOn(prismaService.user, 'update')
-        .mockResolvedValueOnce({ id: userId } as any);
+  describe("logout", () => {
+    it("should update lastLogout and return success response", async () => {
+      const userId = "123";
 
-      await expect(authService.blacklistToken(userId)).resolves.toBeUndefined();
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prismaService.user.update).toHaveBeenCalledWith({
+      const updateSpy = jest
+        .spyOn(prismaService.user, "update")
+        .mockResolvedValueOnce({} as any); // bisa juga mock user object jika perlu
+
+      const result = await authService.logout(userId);
+
+      expect(updateSpy).toHaveBeenCalledWith({
         where: { id: userId },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        data: { lastLogout: expect.any(Date) },
+        data: { lastLogout: expect.any(BigInt) },
+      });
+
+      expect(result).toEqual({
+        success: true,
+        message: "Berhasil logout",
       });
     });
 
-    it('should throw an error if updating lastLogout fails', async () => {
-      const userId = '123';
-      jest
-        .spyOn(prismaService.user, 'update')
-        .mockRejectedValueOnce(new Error('DB Error'));
-
-      await expect(authService.blacklistToken(userId)).rejects.toThrow(
-        'DB Error',
+    it("should throw BadRequestException if userId is missing", async () => {
+      await expect(authService.logout("")).rejects.toThrow(
+        "User ID harus diisi",
       );
+    });
+
+    it("should return failure response if update throws error", async () => {
+      const userId = "123";
+
+      jest
+        .spyOn(prismaService.user, "update")
+        .mockRejectedValueOnce(new Error("DB Error"));
+
+      const result = await authService.logout(userId);
+
+      expect(result).toEqual({
+        success: false,
+        message: "Gagal logout",
+      });
     });
   });
 
-  describe('isTokenBlacklisted', () => {
-    it('should return true if user is not found', async () => {
-      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValueOnce(null);
-
-      const result = await authService.isTokenBlacklisted('token', '123');
-      expect(result).toBe(true);
-    });
-
-    it('should return true if lastLogout is null', async () => {
-      jest
-        .spyOn(prismaService.user, 'findUnique')
-        .mockResolvedValueOnce({ id: '123', lastLogout: null } as any);
-
-      const result = await authService.isTokenBlacklisted('token', '123');
-      expect(result).toBe(true);
-    });
-
-    it('should return true if token is invalid', async () => {
-      jest.spyOn(jwt, 'decode').mockReturnValue(null);
-
-      const result = await authService.isTokenBlacklisted(
-        'invalidToken',
-        '123',
-      );
-      expect(result).toBe(true);
-    });
-
-    it('should return false if token is still valid', async () => {
-      const mockLastLogout = new Date(Date.now() - 10000);
-      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValueOnce({
-        id: '123',
-        lastLogout: mockLastLogout,
-      } as any);
-      jest.spyOn(jwt, 'decode').mockReturnValue({
-        iat: Math.floor(Date.now() / 1000),
-      } as jwt.JwtPayload);
-
-      const result = await authService.isTokenBlacklisted('validToken', '123');
-      expect(result).toBe(false);
-    });
-
-    it('should return true if token was issued before lastLogout', async () => {
-      const mockLastLogout = new Date(Date.now() + 10000);
-      jest.spyOn(prismaService.user, 'findUnique').mockResolvedValueOnce({
-        id: '123',
-        lastLogout: mockLastLogout,
-      } as any);
-      jest.spyOn(jwt, 'decode').mockReturnValue({
-        iat: Math.floor(Date.now() / 1000) - 20000,
-      } as jwt.JwtPayload);
-
-      const result = await authService.isTokenBlacklisted(
-        'expiredToken',
-        '123',
-      );
-      expect(result).toBe(true);
-    });
-
-    it('should return true if an error occurs during token decoding or user lookup', async () => {
-      // Simulating an error during token decoding or database lookup
-      jest
-        .spyOn(prismaService.user, 'findUnique')
-        .mockRejectedValueOnce(new Error('DB Error'));
-      const result = await authService.isTokenBlacklisted('someToken', '123');
-      expect(result).toBe(true);
-    });
-  });
-
-  describe('logout', () => {
-    it('should call blacklistToken with the correct userId', async () => {
-      const userId = '123';
-      jest.spyOn(authService, 'blacklistToken').mockResolvedValueOnce();
-
-      await authService.logout(userId);
-
-      expect(authService.blacklistToken).toHaveBeenCalledWith(userId);
-    });
-  });
-
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(authService).toBeDefined();
   });
 
-  it('should register a new user successfully', async () => {
+  it("should register a new user successfully", async () => {
     const dto: AuthDto = {
-      email: 'test@example.com',
-      password: 'password123',
+      email: "test@example.com",
+      password: "password123",
     };
 
     const mockUser = {
-      id: '123',
-      email: 'test@test.com',
-      password: 'hashedpassword',
-      role: 'user',
-      lastLogout: null,
+      id: "123",
+      email: "test@test.com",
+      password: "hashedpassword",
+      role: "user",
+      lastLogout: BigInt(Date.now()),
     };
 
-    jest.spyOn(argon, 'hash').mockResolvedValue('hashedpassword');
-    jest.spyOn(prismaService.user, 'create').mockResolvedValue(mockUser);
+    jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
+    jest.spyOn(prismaService.user, "create").mockResolvedValue(mockUser);
 
     const result = await authService.register(dto);
 
@@ -170,8 +112,9 @@ describe('AuthService', () => {
     expect(prismaService.user.create).toHaveBeenCalledWith({
       data: {
         email: dto.email,
-        password: 'hashedpassword',
-        role: 'user',
+        password: "hashedpassword",
+        role: "user",
+        lastLogout: expect.any(BigInt),
       },
     });
 
@@ -182,65 +125,65 @@ describe('AuthService', () => {
     });
   });
 
-  it('should throw ForbiddenException if email is already registered', async () => {
+  it("should throw ForbiddenException if email is already registered", async () => {
     const dto: AuthDto = {
-      email: 'duplicate@example.com',
-      password: 'password123',
+      email: "duplicate@example.com",
+      password: "password123",
     };
 
-    jest.spyOn(argon, 'hash').mockResolvedValue('hashedpassword');
-    jest.spyOn(prismaService.user, 'create').mockRejectedValue(
-      new PrismaClientKnownRequestError('', {
-        code: 'P2002',
-        clientVersion: '6.4.1',
+    jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
+    jest.spyOn(prismaService.user, "create").mockRejectedValue(
+      new PrismaClientKnownRequestError("", {
+        code: "P2002",
+        clientVersion: "6.4.1",
       }),
     );
 
     await expect(authService.register(dto)).rejects.toThrow(ForbiddenException);
     await expect(authService.register(dto)).rejects.toThrow(
-      'Email has already been registered',
+      "Email has already been registered",
     );
 
     expect(argon.hash).toHaveBeenCalledWith(dto.password);
     expect(prismaService.user.create).toHaveBeenCalled();
   });
 
-  it('should throw a generic error if Prisma fails unexpectedly', async () => {
+  it("should throw a generic error if Prisma fails unexpectedly", async () => {
     const dto: AuthDto = {
-      email: 'fail@example.com',
-      password: 'password123',
+      email: "fail@example.com",
+      password: "password123",
     };
 
-    jest.spyOn(argon, 'hash').mockResolvedValue('hashedpassword');
+    jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
     jest
-      .spyOn(prismaService.user, 'create')
-      .mockRejectedValue(new Error('Unexpected database error'));
+      .spyOn(prismaService.user, "create")
+      .mockRejectedValue(new Error("Unexpected database error"));
 
     await expect(authService.register(dto)).rejects.toThrow(Error);
     await expect(authService.register(dto)).rejects.toThrow(
-      'Unexpected database error',
+      "Unexpected database error",
     );
 
     expect(argon.hash).toHaveBeenCalledWith(dto.password);
     expect(prismaService.user.create).toHaveBeenCalled();
   });
 
-  it('should return user details when login is successful', async () => {
+  it("should return user details when login is successful", async () => {
     const dto: AuthDto = {
-      email: 'test@example.com',
-      password: 'password123',
+      email: "test@example.com",
+      password: "password123",
     };
 
     const mockUser = {
-      id: '123',
+      id: "123",
       email: dto.email,
-      password: 'hashedpassword',
-      role: 'user',
-      lastLogout: new Date(),
+      password: "hashedpassword",
+      role: "user",
+      lastLogout: BigInt(Date.now()),
     };
 
-    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(mockUser);
-    jest.spyOn(argon, 'verify').mockResolvedValue(true);
+    jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
+    jest.spyOn(argon, "verify").mockResolvedValue(true);
 
     const result = await authService.login(dto);
 
@@ -249,24 +192,26 @@ describe('AuthService', () => {
     });
     expect(argon.verify).toHaveBeenCalledWith(mockUser.password, dto.password);
     expect(result).toEqual({
-      id: '123',
-      email: mockUser.email,
-      role: mockUser.role,
-      lastLogout: mockUser.lastLogout,
+      access_token: "mocked-jwt-token",
+      user: {
+        id: "123",
+        email: mockUser.email,
+        role: mockUser.role,
+      }
     });
   });
 
-  it('should throw ForbiddenException if user is not found', async () => {
+  it("should throw ForbiddenException if user is not found", async () => {
     const dto: AuthDto = {
-      email: 'nonexistent@example.com',
-      password: 'password123',
+      email: "nonexistent@example.com",
+      password: "password123",
     };
 
-    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(null);
+    jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(null);
 
     await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
     await expect(authService.login(dto)).rejects.toThrow(
-      'Username or password is incorrect',
+      "Username or password is incorrect",
     );
 
     expect(prismaService.user.findUnique).toHaveBeenCalledWith({
@@ -274,26 +219,26 @@ describe('AuthService', () => {
     });
   });
 
-  it('should throw ForbiddenException if password is incorrect', async () => {
+  it("should throw ForbiddenException if password is incorrect", async () => {
     const dto: AuthDto = {
-      email: 'test@example.com',
-      password: 'wrongpassword',
+      email: "test@example.com",
+      password: "wrongpassword",
     };
 
     const mockUser = {
-      id: '123',
+      id: "123",
       email: dto.email,
-      password: 'hashedpassword',
-      role: 'user',
-      lastLogout: new Date(),
+      password: "hashedpassword",
+      role: "user",
+      lastLogout: BigInt(Date.now()),
     };
 
-    jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(mockUser);
-    jest.spyOn(argon, 'verify').mockResolvedValue(false);
+    jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
+    jest.spyOn(argon, "verify").mockResolvedValue(false);
 
     await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
     await expect(authService.login(dto)).rejects.toThrow(
-      'Username or password is incorrect',
+      "Username or password is incorrect",
     );
 
     expect(prismaService.user.findUnique).toHaveBeenCalledWith({
@@ -302,18 +247,18 @@ describe('AuthService', () => {
     expect(argon.verify).toHaveBeenCalledWith(mockUser.password, dto.password);
   });
 
-  it('should throw an error if Prisma throws an exception', async () => {
+  it("should throw an error if Prisma throws an exception", async () => {
     const dto: AuthDto = {
-      email: 'test@example.com',
-      password: 'password123',
+      email: "test@example.com",
+      password: "password123",
     };
 
     jest
-      .spyOn(prismaService.user, 'findUnique')
-      .mockRejectedValue(new Error('Database error'));
+      .spyOn(prismaService.user, "findUnique")
+      .mockRejectedValue(new Error("Database error"));
 
     await expect(authService.login(dto)).rejects.toThrow(Error);
-    await expect(authService.login(dto)).rejects.toThrow('Database error');
+    await expect(authService.login(dto)).rejects.toThrow("Database error");
 
     expect(prismaService.user.findUnique).toHaveBeenCalledWith({
       where: { email: dto.email },
