@@ -62,6 +62,7 @@ jobs:
             POSTGRES_PORT=${{ secrets.DB_PORT }}
             DATABASE_URL=postgresql://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@${{ secrets.DB_HOST }}:${{ secrets.DB_PORT }}/${{ secrets.DB_DB }}?schema=public
             IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}:latest
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
           EOF
       
       - name: Set up ssh key
