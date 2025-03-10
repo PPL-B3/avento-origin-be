@@ -10,8 +10,9 @@ import { PrismaService } from "./prisma/prisma.service";
 import { AuthModule } from "./auth/auth.module";
 import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 
+
 @Module({
-  imports: [HelloModule, PrismaModule, AuthModule],
+  imports: [HelloModule, PrismaModule, AuthModule, DocumentModule],
   providers: [PrismaService],
 })
 export class AppModule implements NestModule {
