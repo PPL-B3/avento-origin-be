@@ -2,41 +2,44 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { JwtService } from "./jwt.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import * as jwt from "jsonwebtoken";
+import { ConfigService } from "@nestjs/config";
 
 // Mock the jsonwebtoken module
 jest.mock("jsonwebtoken");
 
-// Mock the PrismaService
-const mockPrismaService = {
-  user: {
-    findUnique: jest.fn(),
-  },
-};
-
 describe("JwtService", () => {
   let service: JwtService;
-  let prismaService: PrismaService;
-  const mockJwtSecret = "test_secret";
+  const mockJwtSecret = "default_secret";
+
+  // Create mocks for PrismaService and ConfigService
+  const mockPrismaService = {
+    user: {
+      findUnique: jest.fn(),
+    },
+  };
+
+  const mockConfigService = {
+    get: jest.fn().mockImplementation((key: string, defaultVal?: string) => {
+      if (key === "JWT_SECRET") {
+        return mockJwtSecret;
+      }
+      return defaultVal;
+    }),
+  };
 
   beforeEach(async () => {
     // Reset all mocks before each test
     jest.clearAllMocks();
 
-    // Set the JWT_SECRET environment variable for testing
-    process.env.JWT_SECRET = mockJwtSecret;
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JwtService,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 
     service = module.get<JwtService>(JwtService);
-    prismaService = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -89,9 +92,6 @@ describe("JwtService", () => {
       const payload = { userId: "user123", iat: 1234567890 };
       const mockToken = "mock.jwt.token";
       (jwt.sign as jest.Mock).mockReturnValue(mockToken);
-
-      // Re-instantiate service with default secret
-      const service = new JwtService(prismaService as any);
 
       // Act
       const result = service.generateToken(payload);
