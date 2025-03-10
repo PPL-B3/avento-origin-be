@@ -9,6 +9,7 @@ services:
       - POSTGRES_HOST=database
       - POSTGRES_PORT=5432
       - DATABASE_URL=postgresql://postgres:postgres@database:5432/avento_origin?schema=public
+      - JWT_SECRET=dev_jwt_secret
     ports:
       - "4000:4000"
 

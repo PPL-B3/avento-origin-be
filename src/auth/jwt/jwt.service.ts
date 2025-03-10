@@ -17,7 +17,7 @@ export class JwtService {
         userId: payload.userId,
         iat: issuedAt,
       },
-      this.configService.get<string>("JWT_SECRET", "jwt_default"),
+      this.configService.get<string>("JWT_SECRET", "default_secret"),
       {
         expiresIn: "1h",
       },
@@ -27,7 +27,7 @@ export class JwtService {
   verifyToken(token: string): jwt.JwtPayload {
     return jwt.verify(
       token,
-      this.configService.get<string>("JWT_SECRET", "jwt_default"),
+      this.configService.get<string>("JWT_SECRET", "default_secret"),
     ) as jwt.JwtPayload;
   }
 
