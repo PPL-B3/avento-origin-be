@@ -12,7 +12,7 @@ import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 
 
 @Module({
-  imports: [HelloModule, PrismaModule, AuthModule, DocumentModule],
+  imports: [HelloModule, PrismaModule, AuthModule],
   providers: [PrismaService],
 })
 export class AppModule implements NestModule {
