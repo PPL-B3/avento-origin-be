@@ -11,7 +11,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 export class JwtAuthMiddleware implements NestMiddleware {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
@@ -29,11 +29,11 @@ export class JwtAuthMiddleware implements NestMiddleware {
       // Check if the token is blacklisted before proceeding further
       const isBlacklisted = await this.jwtService.isTokenBlacklisted(
         token,
-        userId,
+        userId
       );
       if (isBlacklisted) {
         throw new UnauthorizedException(
-          "Token sudah tidak berlaku (sudah logout)",
+          "Token sudah tidak berlaku (sudah logout)"
         );
       }
 

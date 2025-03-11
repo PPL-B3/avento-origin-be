@@ -1,7 +1,7 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { DocumentModule } from "./document.module";
 import { DocumentController } from "./document.controller";
+import { DocumentModule } from "./document.module";
 import { DocumentService } from "./document.service";
+import { Test, TestingModule } from "@nestjs/testing";
 
 describe("DocumentModule", () => {
   let module: TestingModule;
