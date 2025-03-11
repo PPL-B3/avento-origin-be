@@ -19,7 +19,7 @@ export class DocumentController {
   @UseInterceptors(FileInterceptor("file"))
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File | null,
-    @Body() body: UploadDocumentDTO
+    @Body() body: UploadDocumentDTO,
   ) {
     if (!file) throw new BadRequestException("No file uploaded.");
     if (file.mimetype !== "application/pdf") {

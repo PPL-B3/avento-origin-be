@@ -9,6 +9,11 @@ services:
       - POSTGRES_PORT
       - DATABASE_URL
       - JWT_SECRET
+      - DO_SPACES_BUCKET
+      - DO_SPACES_REGION
+      - DO_SPACES_ENDPOINT
+      - DO_SPACES_KEY
+      - DO_SPACES_SECRET
     ports:
       - "4000:4000"
 

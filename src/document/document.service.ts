@@ -1,16 +1,18 @@
 import * as AWS from "aws-sdk";
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PutObjectRequest } from "aws-sdk/clients/s3";
 
 @Injectable()
 export class DocumentService {
   private bucket: AWS.S3;
 
-  constructor() {
+  constructor(private readonly configSerivce: ConfigService) {
     this.bucket = new AWS.S3({
-      endpoint: process.env.DO_SPACES_ENDPOINT,
-      accessKeyId: process.env.DO_SPACES_KEY,
-      secretAccessKey: process.env.DO_SPACES_SECRET,
-      region: process.env.DO_SPACES_REGION,
+      endpoint: configSerivce.get<string>("DO_SPACES_ENDPOINT"),
+      accessKeyId: configSerivce.get<string>("DO_SPACES_KEY"),
+      secretAccessKey: configSerivce.get<string>("DO_SPACES_SECRET"),
+      region: configSerivce.get<string>("DO_SPACES_REGION"),
     });
   }
 
@@ -18,18 +20,20 @@ export class DocumentService {
     pdf: Express.Multer.File,
     filename: string
   ): Promise<string> {
-    if (!process.env.DO_SPACES_BUCKET) {
+    if (!this.configSerivce.get<string>("DO_SPACES_BUCKET")) {
       throw new Error("DO_SPACES_BUCKET environment variable is not defined.");
     }
 
     const params = {
-      Bucket: process.env.DO_SPACES_BUCKET,
+      Bucket: this.configSerivce.get<string>("DO_SPACES_BUCKET"),
       Key: filename,
       Body: pdf.buffer,
       ContentType: pdf.mimetype,
     };
 
-    const { Location } = await this.bucket.upload(params).promise();
+    const { Location } = await this.bucket
+      .upload(params as PutObjectRequest)
+      .promise();
 
     return Location;
   }

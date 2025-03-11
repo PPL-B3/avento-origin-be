@@ -11,7 +11,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 export class JwtAuthMiddleware implements NestMiddleware {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
