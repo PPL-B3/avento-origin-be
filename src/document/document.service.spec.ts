@@ -27,7 +27,10 @@ describe("DocumentService", () => {
     process.env.DO_SPACES_BUCKET = "test-bucket";
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DocumentService, ConfigService],
+      providers: [
+        DocumentService,
+        { provide: ConfigService, useValue: jest.fn() },
+      ],
     }).compile();
 
     service = module.get<DocumentService>(DocumentService);
