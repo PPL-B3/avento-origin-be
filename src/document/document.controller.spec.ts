@@ -1,18 +1,19 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { DocumentController } from "./document.controller";
-import { DocumentService } from "./document.service";
+import * as fs from "fs";
+import * as path from "path";
 import {
   BadRequestException,
   InternalServerErrorException,
 } from "@nestjs/common";
+import { DocumentController } from "./document.controller";
+import { DocumentService } from "./document.service";
+import { Test, TestingModule } from "@nestjs/testing";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
-import * as fs from "fs";
-import * as path from "path";
 
 describe("DocumentController", () => {
   let controller: DocumentController;
   let service: DocumentService;
-  let mockFile: Express.Multer.File;
+  let mockValidFile: Express.Multer.File;
+  let mockOversizedFile: Express.Multer.File;
   let mockBody: UploadDocumentDTO;
 
   beforeEach(async () => {
@@ -34,11 +35,11 @@ describe("DocumentController", () => {
     controller = module.get<DocumentController>(DocumentController);
     service = module.get<DocumentService>(DocumentService);
 
-    // Load the actual PDF file as a Buffer
+    // Load the actual PDF file as a Buffer.
     const filePath = path.join(__dirname, "dummy.pdf");
     const fileBuffer = fs.readFileSync(filePath);
 
-    mockFile = {
+    mockValidFile = {
       buffer: fileBuffer,
       mimetype: "application/pdf",
       originalname: "dummy.pdf",
@@ -48,6 +49,11 @@ describe("DocumentController", () => {
       destination: "",
       filename: "dummy.pdf",
       path: filePath,
+    } as Express.Multer.File;
+
+    mockOversizedFile = {
+      ...mockValidFile,
+      size: 12 * 1024 * 1024, // 12MB (exceeds limit).
     } as Express.Multer.File;
 
     mockBody = {
@@ -71,10 +77,16 @@ describe("DocumentController", () => {
   });
 
   it("should throw BadRequestException if file type is not PDF", async () => {
-    const invalidFile = { ...mockFile, mimetype: "image/png" };
+    const invalidFile = { ...mockValidFile, mimetype: "image/png" };
     await expect(
       controller.uploadDocument(invalidFile, mockBody)
     ).rejects.toThrow(new BadRequestException("Invalid file type."));
+  });
+
+  it("should throw BadRequestException if file size exceeds 8MB", async () => {
+    await expect(
+      controller.uploadDocument(mockOversizedFile, mockBody)
+    ).rejects.toThrow(new BadRequestException("File size exceeds 8MB limit."));
   });
 
   it("should throw error when required fields are missing", async () => {
@@ -96,14 +108,17 @@ describe("DocumentController", () => {
   });
 
   it("should return success response if file and body are valid", async () => {
-    const response = await controller.uploadDocument(mockFile, mockBody);
+    const response = await controller.uploadDocument(mockValidFile, mockBody);
 
     expect(response).toEqual({
       message: "Document uploaded successfully.",
       url: "https://mock-url.com/document.pdf",
     });
 
-    expect(service.uploadDocument).toHaveBeenCalledWith(mockFile, mockBody);
+    expect(service.uploadDocument).toHaveBeenCalledWith(
+      mockValidFile,
+      mockBody
+    );
   });
 
   it("should throw InternalServerErrorException if service throws an error", async () => {
@@ -111,8 +126,8 @@ describe("DocumentController", () => {
       .spyOn(service, "uploadDocument")
       .mockRejectedValue(new Error("S3 Upload Failed"));
 
-    await expect(controller.uploadDocument(mockFile, mockBody)).rejects.toThrow(
-      new InternalServerErrorException("S3 Upload Failed")
-    );
+    await expect(
+      controller.uploadDocument(mockValidFile, mockBody)
+    ).rejects.toThrow(new InternalServerErrorException("S3 Upload Failed"));
   });
 });

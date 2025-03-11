@@ -1,9 +1,9 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { DocumentService } from "./document.service";
 import * as AWS from "aws-sdk";
 import * as fs from "fs";
 import * as path from "path";
 import { ConfigService } from "@nestjs/config";
+import { DocumentService } from "./document.service";
+import { Test, TestingModule } from "@nestjs/testing";
 
 jest.mock("aws-sdk", () => {
   const mockS3Instance = {
@@ -80,12 +80,12 @@ describe("DocumentService", () => {
 
   it("should throw an error if DO_SPACES_BUCKET is not set", async () => {
     // Override the get method to simulate a missing DO_SPACES_BUCKET value.
-    jest.spyOn(configService, 'get').mockImplementation((key: string) => {
+    jest.spyOn(configService, "get").mockImplementation((key: string) => {
       const config = {
-        DO_SPACES_ENDPOINT: 'https://example-endpoint.com',
-        DO_SPACES_KEY: 'exampleAccessKey',
-        DO_SPACES_SECRET: 'exampleSecretKey',
-        DO_SPACES_REGION: 'example-region',
+        DO_SPACES_ENDPOINT: "https://example-endpoint.com",
+        DO_SPACES_KEY: "exampleAccessKey",
+        DO_SPACES_SECRET: "exampleSecretKey",
+        DO_SPACES_REGION: "example-region",
         DO_SPACES_BUCKET: undefined, // Simulate missing bucket value
       };
       return config[key];
