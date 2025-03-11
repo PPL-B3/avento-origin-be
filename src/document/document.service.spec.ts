@@ -3,6 +3,7 @@ import { DocumentService } from "./document.service";
 import * as AWS from "aws-sdk";
 import * as fs from "fs";
 import * as path from "path";
+import { ConfigService } from "@nestjs/config";
 
 jest.mock("aws-sdk", () => {
   const mockS3Instance = {
@@ -26,7 +27,7 @@ describe("DocumentService", () => {
     process.env.DO_SPACES_BUCKET = "test-bucket";
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DocumentService],
+      providers: [DocumentService, ConfigService],
     }).compile();
 
     service = module.get<DocumentService>(DocumentService);

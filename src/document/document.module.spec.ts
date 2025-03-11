@@ -2,13 +2,14 @@ import { DocumentController } from "./document.controller";
 import { DocumentModule } from "./document.module";
 import { DocumentService } from "./document.service";
 import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
 
 describe("DocumentModule", () => {
   let module: TestingModule;
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
-      imports: [DocumentModule],
+      imports: [DocumentModule, ConfigService],
     }).compile();
   });
 
