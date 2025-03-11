@@ -1,4 +1,4 @@
-import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ConfigModule } from "@nestjs/config";
 import { DocumentController } from "./document.controller";
 import { DocumentModule } from "./document.module";
 import { DocumentService } from "./document.service";
