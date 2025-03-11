@@ -78,7 +78,7 @@ describe("DocumentService", () => {
 
   it("should return a success message with the document URL", async () => {
     const response = await service.uploadDocument(mockFile, {
-      ownerId: "mock-user",
+      ownerName: "mock-user",
     });
 
     expect(response).toEqual({

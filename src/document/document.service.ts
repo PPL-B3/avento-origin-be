@@ -35,7 +35,7 @@ export class DocumentService {
   }
 
   async uploadDocument(pdf: Express.Multer.File, body: any) {
-    const url = await this.uploadToBucket(pdf, body.ownerId);
+    const url = await this.uploadToBucket(pdf, body.ownerName);
     return { message: "Document uploaded successfully.", url };
   }
 }
