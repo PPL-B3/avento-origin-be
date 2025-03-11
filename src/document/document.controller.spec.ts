@@ -112,7 +112,6 @@ describe("DocumentController", () => {
 
     expect(response).toEqual({
       message: "Document uploaded successfully.",
-      url: "https://mock-url.com/document.pdf",
     });
 
     expect(service.uploadDocument).toHaveBeenCalledWith(

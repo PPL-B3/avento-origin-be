@@ -31,3 +31,11 @@ model User {
 
   @@map("users")
 }
+
+model Document {
+  documentID   String   @id @default(uuid())
+  documentName String
+  filePath     String
+  uploadDate   DateTime @default(now())
+  ownerName    String
+}
