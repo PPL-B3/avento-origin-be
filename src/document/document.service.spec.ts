@@ -20,6 +20,7 @@ jest.mock("aws-sdk", () => {
 
 describe("DocumentService", () => {
   let service: DocumentService;
+  let configService: ConfigService;
   let bucket: AWS.S3;
   let mockFile: Express.Multer.File;
 
@@ -29,11 +30,27 @@ describe("DocumentService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DocumentService,
-        { provide: ConfigService, useValue: jest.fn() },
+        {
+          provide: ConfigService,
+          useValue: {
+            // Jest mock for the `get` method
+            get: (key: string) => {
+              const config = {
+                DO_SPACES_ENDPOINT: "https://example-endpoint.com",
+                DO_SPACES_KEY: "exampleAccessKey",
+                DO_SPACES_SECRET: "exampleSecretKey",
+                DO_SPACES_REGION: "example-region",
+                DO_SPACES_BUCKET: "example-bucket", // Change this value to test the conditional logic if needed
+              };
+              return config[key];
+            },
+          },
+        },
       ],
     }).compile();
 
     service = module.get<DocumentService>(DocumentService);
+    configService = module.get<ConfigService>(ConfigService);
     bucket = new AWS.S3();
 
     // Load the actual PDF file as a Buffer.
@@ -62,7 +79,17 @@ describe("DocumentService", () => {
   });
 
   it("should throw an error if DO_SPACES_BUCKET is not set", async () => {
-    delete process.env.DO_SPACES_BUCKET;
+    // Override the get method to simulate a missing DO_SPACES_BUCKET value.
+    jest.spyOn(configService, 'get').mockImplementation((key: string) => {
+      const config = {
+        DO_SPACES_ENDPOINT: 'https://example-endpoint.com',
+        DO_SPACES_KEY: 'exampleAccessKey',
+        DO_SPACES_SECRET: 'exampleSecretKey',
+        DO_SPACES_REGION: 'example-region',
+        DO_SPACES_BUCKET: undefined, // Simulate missing bucket value
+      };
+      return config[key];
+    });
     await expect(service.uploadToBucket(mockFile, "test.pdf")).rejects.toThrow(
       "DO_SPACES_BUCKET environment variable is not defined."
     );
@@ -73,7 +100,7 @@ describe("DocumentService", () => {
 
     expect(url).toBe("https://mock-url.com/document.pdf");
     expect(bucket.upload).toHaveBeenCalledWith({
-      Bucket: "test-bucket",
+      Bucket: "example-bucket",
       Key: "test.pdf",
       Body: mockFile.buffer,
       ContentType: "application/pdf",

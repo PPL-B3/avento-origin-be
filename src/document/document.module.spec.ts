@@ -1,3 +1,4 @@
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { DocumentController } from "./document.controller";
 import { DocumentModule } from "./document.module";
 import { DocumentService } from "./document.service";
@@ -8,7 +9,7 @@ describe("DocumentModule", () => {
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
-      imports: [DocumentModule],
+      imports: [DocumentModule, ConfigModule.forRoot({ isGlobal: true })],
     }).compile();
   });
 
