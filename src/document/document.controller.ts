@@ -35,10 +35,9 @@ export class DocumentController {
     }
 
     try {
-      const response = await this.service.uploadDocument(file, body);
-      const { message, ...rest } = response;
+      await this.service.uploadDocument(file, body);
 
-      return { message: "Document uploaded successfully.", ...rest };
+      return { message: "Document uploaded successfully." };
     } catch (error) {
       throw new InternalServerErrorException(error.message);
     }

@@ -1,7 +1,7 @@
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { DocumentController } from "./document.controller";
-import { DocumentModule } from "./document.module";
 import { DocumentService } from "./document.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { Test, TestingModule } from "@nestjs/testing";
 
 describe("DocumentModule", () => {
@@ -9,7 +9,9 @@ describe("DocumentModule", () => {
 
   beforeEach(async () => {
     module = await Test.createTestingModule({
-      imports: [DocumentModule, ConfigModule.forRoot({ isGlobal: true })],
+      imports: [ConfigModule.forRoot({ isGlobal: true })],
+      providers: [DocumentService, PrismaService, ConfigService],
+      controllers: [DocumentController],
     }).compile();
   });
 
