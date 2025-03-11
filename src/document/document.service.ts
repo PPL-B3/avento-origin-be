@@ -5,7 +5,7 @@ import { PutObjectRequest } from "aws-sdk/clients/s3";
 
 @Injectable()
 export class DocumentService {
-  private bucket: AWS.S3;
+  private readonly bucket: AWS.S3;
 
   constructor(private readonly configSerivce: ConfigService) {
     this.bucket = new AWS.S3({
