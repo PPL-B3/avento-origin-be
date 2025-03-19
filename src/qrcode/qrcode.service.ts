@@ -6,7 +6,7 @@ import { PrismaService } from "../prisma/prisma.service";
 export class QrcodeService {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async generateQr(documentId: string) {
+  async generateQr(documentId: string, ownerName: string) {
     try {
       await this.prismaService.document.findUniqueOrThrow({
         where: { documentID: documentId },
@@ -23,6 +23,7 @@ export class QrcodeService {
     const privateQr = await this.prismaService.qRCode.create({
       data: {
         documentId,
+        owner: ownerName,
         isPrivate: true,
         isActive: true,
       },
@@ -34,6 +35,7 @@ export class QrcodeService {
     const publicQr = await this.prismaService.qRCode.create({
       data: {
         documentId,
+        owner: ownerName,
         isPrivate: false,
         isActive: true,
       },
