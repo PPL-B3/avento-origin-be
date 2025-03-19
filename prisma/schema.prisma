@@ -38,4 +38,16 @@ model Document {
   filePath     String
   uploadDate   DateTime @default(now())
   ownerName    String
+  qrCode       QRCode[]
+}
+
+model QRCode {
+    id String @id @default(uuid())
+    isPrivate Boolean
+    isActive Boolean
+
+    document Document @relation(fields: [documentId], references: [documentID])
+    documentId String
+
+    @@map("qrcodes")
 }
