@@ -37,12 +37,13 @@ model Document {
   documentName String
   filePath     String
   uploadDate   DateTime @default(now())
-  ownerName    String
+  publisher    String
   qrCode       QRCode[]
 }
 
 model QRCode {
     id String @id @default(uuid())
+    owner String
     isPrivate Boolean
     isActive Boolean
 
