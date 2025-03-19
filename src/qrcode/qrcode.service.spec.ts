@@ -32,6 +32,7 @@ describe("QrcodeService", () => {
 
   it("should throw a bad request error if documentId is not found", async () => {
     const docId = "123";
+    const owner = "owner";
 
     jest.spyOn(prismaService.document, "findUniqueOrThrow").mockRejectedValue(
       new PrismaClientKnownRequestError("", {
@@ -40,13 +41,14 @@ describe("QrcodeService", () => {
       }),
     );
 
-    await expect(qrService.generateQr(docId)).rejects.toThrow(
+    await expect(qrService.generateQr(docId, owner)).rejects.toThrow(
       new BadRequestException("No document found with such ID"),
     );
   });
 
   it("should propegate error if exception code is other", async () => {
     const docId = "123";
+    const owner = "owner";
 
     const err = new PrismaClientKnownRequestError("", {
       code: "P6969",
@@ -57,7 +59,7 @@ describe("QrcodeService", () => {
       .spyOn(prismaService.document, "findUniqueOrThrow")
       .mockRejectedValue(err);
 
-    await expect(qrService.generateQr(docId)).rejects.toThrow(err);
+    await expect(qrService.generateQr(docId, owner)).rejects.toThrow(err);
   });
 
   it("should return private and public QR code IDs", async () => {
@@ -66,7 +68,7 @@ describe("QrcodeService", () => {
       documentName: "file",
       filePath: "file.txt",
       uploadDate: new Date(Date.now()),
-      ownerName: "owner",
+      publisher: "publisher",
       qrCode: [],
     };
 
@@ -81,7 +83,10 @@ describe("QrcodeService", () => {
     qrcode_create.mockResolvedValueOnce({ id: privateId } as any);
     qrcode_create.mockResolvedValueOnce({ id: publicId } as any);
 
-    const result = await qrService.generateQr(mockDocument.documentID);
+    const result = await qrService.generateQr(
+      mockDocument.documentID,
+      mockDocument.publisher,
+    );
     expect(result).toEqual({
       privateId: privateId,
       publicId: publicId,
