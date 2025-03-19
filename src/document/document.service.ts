@@ -56,7 +56,7 @@ export class DocumentService {
         documentName: body.documentName,
         filePath: url,
         uploadDate: new Date(timestamp),
-        ownerName: body.ownerName,
+        publisher: body.ownerName,
       },
     });
   }
