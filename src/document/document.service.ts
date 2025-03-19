@@ -11,7 +11,7 @@ export class DocumentService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
     this.bucket = new AWS.S3({
       endpoint: configService.get<string>("DO_SPACES_ENDPOINT"),
@@ -24,7 +24,7 @@ export class DocumentService {
   async uploadToBucket(
     pdf: Express.Multer.File,
     body: UploadDocumentDTO,
-    timestamp: number
+    timestamp: number,
   ): Promise<string> {
     const bucketName = this.configService.get<string>("DO_SPACES_BUCKET");
     if (!bucketName) {
