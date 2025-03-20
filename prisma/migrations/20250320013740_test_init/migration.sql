@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "qrcodes" ADD COLUMN     "generatedDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

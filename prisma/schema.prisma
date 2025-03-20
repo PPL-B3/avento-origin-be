@@ -46,6 +46,7 @@ model QRCode {
     owner String
     isPrivate Boolean
     isActive Boolean
+    generatedDate DateTime @default(now())
 
     document Document @relation(fields: [documentId], references: [documentID])
     documentId String
