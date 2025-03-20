@@ -10,18 +10,22 @@ import {
 import { DocumentService } from "./document.service";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
+import { QrcodeService } from "../qrcode/qrcode.service";
 
 @Controller("documents")
 export class DocumentController {
   private readonly MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB.
 
-  constructor(private readonly service: DocumentService) {}
+  constructor(
+    private readonly service: DocumentService,
+    private readonly qrService: QrcodeService,
+  ) {}
 
   @Post("upload")
   @UseInterceptors(FileInterceptor("file"))
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File | null,
-    @Body() body: UploadDocumentDTO
+    @Body() body: UploadDocumentDTO,
   ) {
     if (!file) throw new BadRequestException("No file uploaded.");
     if (file.mimetype !== "application/pdf") {
@@ -35,9 +39,8 @@ export class DocumentController {
     }
 
     try {
-      await this.service.uploadDocument(file, body);
-
-      return { message: "Document uploaded successfully." };
+      const doc = await this.service.uploadDocument(file, body);
+      return await this.qrService.generateQr(doc.documentID, body.ownerName);
     } catch (error) {
       throw new InternalServerErrorException(error.message);
     }

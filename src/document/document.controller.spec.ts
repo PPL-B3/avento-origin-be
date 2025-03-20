@@ -8,6 +8,7 @@ import { DocumentController } from "./document.controller";
 import { DocumentService } from "./document.service";
 import { Test, TestingModule } from "@nestjs/testing";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
+import { QrcodeService } from "../qrcode/qrcode.service";
 
 describe("DocumentController", () => {
   let controller: DocumentController;
@@ -26,6 +27,15 @@ describe("DocumentController", () => {
             uploadDocument: jest.fn().mockResolvedValue({
               message: "Document uploaded successfully.",
               url: "https://mock-url.com/document.pdf",
+            }),
+          },
+        },
+        {
+          provide: QrcodeService,
+          useValue: {
+            generateQr: jest.fn().mockResolvedValue({
+              privateId: "private123",
+              publicId: "public123",
             }),
           },
         },
@@ -72,20 +82,20 @@ describe("DocumentController", () => {
 
   it("should throw BadRequestException if no file is uploaded", async () => {
     await expect(controller.uploadDocument(null, mockBody)).rejects.toThrow(
-      new BadRequestException("No file uploaded.")
+      new BadRequestException("No file uploaded."),
     );
   });
 
   it("should throw BadRequestException if file type is not PDF", async () => {
     const invalidFile = { ...mockValidFile, mimetype: "image/png" };
     await expect(
-      controller.uploadDocument(invalidFile, mockBody)
+      controller.uploadDocument(invalidFile, mockBody),
     ).rejects.toThrow(new BadRequestException("Invalid file type."));
   });
 
   it("should throw BadRequestException if file size exceeds 8MB", async () => {
     await expect(
-      controller.uploadDocument(mockOversizedFile, mockBody)
+      controller.uploadDocument(mockOversizedFile, mockBody),
     ).rejects.toThrow(new BadRequestException("File size exceeds 8MB limit."));
   });
 
@@ -96,14 +106,14 @@ describe("DocumentController", () => {
       controller.uploadDocument(mockPdf, {
         documentName: "",
         ownerName: "user",
-      })
+      }),
     ).rejects.toThrow(BadRequestException);
     // Test missing ownerName.
     await expect(
       controller.uploadDocument(mockPdf, {
         documentName: "test",
         ownerName: "",
-      })
+      }),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -111,12 +121,13 @@ describe("DocumentController", () => {
     const response = await controller.uploadDocument(mockValidFile, mockBody);
 
     expect(response).toEqual({
-      message: "Document uploaded successfully.",
+      privateId: "private123",
+      publicId: "public123",
     });
 
     expect(service.uploadDocument).toHaveBeenCalledWith(
       mockValidFile,
-      mockBody
+      mockBody,
     );
   });
 
@@ -126,7 +137,7 @@ describe("DocumentController", () => {
       .mockRejectedValue(new Error("S3 Upload Failed"));
 
     await expect(
-      controller.uploadDocument(mockValidFile, mockBody)
+      controller.uploadDocument(mockValidFile, mockBody),
     ).rejects.toThrow(new InternalServerErrorException("S3 Upload Failed"));
   });
 });
