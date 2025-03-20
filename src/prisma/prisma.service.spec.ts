@@ -12,6 +12,10 @@ describe("PrismaService", () => {
     service = module.get<PrismaService>(PrismaService);
   });
 
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   afterAll(async () => {
     await service.$disconnect();
   });
