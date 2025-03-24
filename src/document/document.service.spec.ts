@@ -55,7 +55,7 @@ describe("DocumentService", () => {
                 documentName: "Test Document",
                 filePath: "https://mock-url.com/document.pdf",
                 uploadDate: new Date(),
-                ownerName: "John Doe",
+                publisher: "John Doe",
               }),
             },
           },
@@ -141,7 +141,7 @@ describe("DocumentService", () => {
       documentName: mockBody.documentName,
       filePath: "https://mock-url.com/document.pdf",
       uploadDate: expect.any(Date),
-      ownerName: mockBody.ownerName,
+      publisher: mockBody.ownerName,
     });
 
     expect(prismaService.document.create).toHaveBeenCalledWith({
@@ -149,7 +149,7 @@ describe("DocumentService", () => {
         documentName: mockBody.documentName,
         filePath: "https://mock-url.com/document.pdf",
         uploadDate: expect.any(Date),
-        ownerName: mockBody.ownerName,
+        publisher: mockBody.ownerName,
       },
     });
   });

@@ -29,7 +29,7 @@ model User {
   role       String
   lastLogout BigInt
 
-  auditLogs AuditLog[] // Tambahkan ini untuk melengkapi relasi
+  auditLogs AuditLog[]
 
   @@map("users")
 }
@@ -40,7 +40,9 @@ model Document {
   filePath     String
   uploadDate   DateTime   @default(now())
   ownerName    String
+  publisher    String
   AuditLog     AuditLog[]
+  qrCode       QRCode[]
 }
 
 model AuditLog {
@@ -50,8 +52,21 @@ model AuditLog {
   user       User      @relation(fields: [userID], references: [id])
   userID     String
   document   Document? @relation(fields: [documentID], references: [documentID])
-  documentID String? // Opsional karena tidak semua event terkait dokumen
+  documentID String?
   details    String
 
   @@map("audit_logs")
+}
+
+model QRCode {
+  id            String   @id @default(uuid())
+  owner         String
+  isPrivate     Boolean
+  isActive      Boolean
+  generatedDate DateTime @default(now())
+
+  document      Document @relation(fields: [documentId], references: [documentID])
+  documentId    String
+
+  @@map("qrcodes")
 }
