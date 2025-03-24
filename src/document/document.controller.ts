@@ -17,7 +17,7 @@ export class DocumentController {
   private readonly MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB.
 
   constructor(
-    private readonly service: DocumentService,
+    private readonly docService: DocumentService,
     private readonly qrService: QrcodeService
   ) {}
 
@@ -39,10 +39,19 @@ export class DocumentController {
     }
 
     try {
-      const doc = await this.service.uploadDocument(file, body);
+      const doc = await this.docService.uploadDocument(file, body);
       return await this.qrService.generateQr(doc.documentID, body.ownerName);
     } catch (error) {
       throw new InternalServerErrorException(error.message);
     }
+  }
+
+  @Post("transfer")
+  async transferDocument(@Body() body: { documentId: string; email: string }) {
+    if (!body.documentId || !body.email) {
+      throw new BadRequestException("Missing documentId or email.");
+    }
+
+    return await this.docService.transferDocument(body.documentId, body.email);
   }
 }
