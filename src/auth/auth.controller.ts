@@ -1,71 +1,81 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { AuthDto } from './dto';
-import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Body } from "@nestjs/common";
+import { AuthService } from "./auth.service";
+import { AuthDto } from "./dto";
+import { ApiBody, ApiOperation, ApiResponse } from "@nestjs/swagger";
 
-@Controller('auth')
+@Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('logout')
-  @ApiOperation({ summary: 'Logout a user' })
+  @Post("logout")
+  @ApiOperation({ summary: "Logout a user" })
   @ApiBody({
-    description: 'User ID required to logout',
+    description: "User ID required to logout",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        userId: { type: 'string', example: '123' },
+        userId: { type: "string", example: "123" },
       },
-      required: ['userId'],
+      required: ["userId"],
     },
   })
-  @ApiResponse({ status: 200, description: 'Successfully logged out', schema: { example: { success: true, message: 'Berhasil logout' } } })
-  @ApiResponse({ status: 400, description: 'User ID must be provided' })
-  logout(@Body('userId') userId: string) {
+  @ApiResponse({
+    status: 200,
+    description: "Successfully logged out",
+    schema: { example: { success: true, message: "Berhasil logout" } },
+  })
+  @ApiResponse({ status: 400, description: "User ID must be provided" })
+  logout(@Body("userId") userId: string) {
     // userId is a string
     return this.authService.logout(userId);
   }
 
-  @Post('register')
-  @ApiOperation({ summary: 'Register a new user' })
+  @Post("register")
+  @ApiOperation({ summary: "Register a new user" })
   @ApiResponse({
     status: 201,
-    description: 'User successfully registered',
+    description: "User successfully registered",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        id: { type: 'string', example: 'abc123' },
-        email: { type: 'string', example: 'user@example.com' },
-        role: { type: 'string', example: 'user' },
+        id: { type: "string", example: "abc123" },
+        email: { type: "string", example: "user@example.com" },
+        role: { type: "string", example: "user" },
       },
     },
   })
-  @ApiResponse({ status: 403, description: 'Email has already been registered' })
+  @ApiResponse({
+    status: 403,
+    description: "Email has already been registered",
+  })
   register(@Body() dto: AuthDto) {
     return this.authService.register(dto);
   }
 
-  @Post('login')
-  @ApiOperation({ summary: 'Login a user' })
+  @Post("login")
+  @ApiOperation({ summary: "Login a user" })
   @ApiResponse({
     status: 200,
-    description: 'User successfully logged in',
+    description: "User successfully logged in",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        access_token: { type: 'string', example: 'jwt-token-string' },
+        access_token: { type: "string", example: "jwt-token-string" },
         user: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'string', example: 'abc123' },
-            email: { type: 'string', example: 'user@example.com' },
-            role: { type: 'string', example: 'user' },
+            id: { type: "string", example: "abc123" },
+            email: { type: "string", example: "user@example.com" },
+            role: { type: "string", example: "user" },
           },
         },
       },
     },
   })
-  @ApiResponse({ status: 403, description: 'Username or password is incorrect' })
+  @ApiResponse({
+    status: 403,
+    description: "Username or password is incorrect",
+  })
   login(@Body() dto: AuthDto) {
     return this.authService.login(dto);
   }

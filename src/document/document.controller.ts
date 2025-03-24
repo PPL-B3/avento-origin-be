@@ -11,7 +11,12 @@ import { DocumentService } from "./document.service";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
 import { QrcodeService } from "../qrcode/qrcode.service";
-import { ApiBody, ApiConsumes, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+} from "@nestjs/swagger";
 
 @Controller("documents")
 export class DocumentController {
@@ -25,7 +30,7 @@ export class DocumentController {
   @Post("upload")
   @UseInterceptors(FileInterceptor("file"))
   @ApiOperation({ summary: "Upload a PDF document and generate QR codes" })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes("multipart/form-data")
   @ApiBody({
     description: "Upload a PDF file with document metadata",
     schema: {
@@ -58,7 +63,11 @@ export class DocumentController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: "Bad Request: Missing file, invalid file type, file too large, or missing required fields" })
+  @ApiResponse({
+    status: 400,
+    description:
+      "Bad Request: Missing file, invalid file type, file too large, or missing required fields",
+  })
   @ApiResponse({ status: 500, description: "Internal Server Error" })
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File | null,
