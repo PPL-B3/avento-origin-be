@@ -1,5 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -7,17 +6,12 @@ export class QrcodeService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async generateQr(documentId: string, ownerName: string) {
-    try {
-      await this.prismaService.document.findUniqueOrThrow({
-        where: { documentID: documentId },
-      });
-    } catch (err) {
-      if (err instanceof PrismaClientKnownRequestError) {
-        if (err.code === "P2025") {
-          throw new BadRequestException("No document found with such ID");
-        }
-      }
-      throw err;
+    const document = await this.prismaService.document.findUnique({
+      where: { documentID: documentId },
+    });
+
+    if (!document) {
+      throw new BadRequestException("Document not found.");
     }
 
     const privateQr = await this.prismaService.qRCode.create({
@@ -31,7 +25,6 @@ export class QrcodeService {
         id: true,
       },
     });
-
     const publicQr = await this.prismaService.qRCode.create({
       data: {
         documentId,
@@ -44,9 +37,15 @@ export class QrcodeService {
       },
     });
 
-    return {
-      privateId: privateQr.id,
-      publicId: publicQr.id,
-    };
+    await this.prismaService.document.update({
+      where: { documentID: documentId },
+      data: {
+        qrCode: {
+          connect: [{ id: privateQr.id }, { id: publicQr.id }],
+        },
+      },
+    });
+
+    return { privateId: privateQr.id, publicId: publicQr.id };
   }
 }
