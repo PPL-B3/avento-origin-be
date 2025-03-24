@@ -1,9 +1,10 @@
 import * as AWS from "aws-sdk";
 import { ConfigService } from "@nestjs/config";
-import { Injectable } from "@nestjs/common";
+import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { PutObjectRequest } from "aws-sdk/clients/s3";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
+import { randomInt } from "crypto";
 
 @Injectable()
 export class DocumentService {
@@ -59,5 +60,34 @@ export class DocumentService {
         publisher: body.ownerName,
       },
     });
+  }
+
+  async transferDocument(documentId: string, email: string) {
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      throw new BadRequestException("Invalid email format.");
+    }
+
+    const document = await this.prisma.document.findUnique({
+      where: { documentID: documentId },
+    });
+
+    if (!document) {
+      throw new BadRequestException("Document not found.");
+    }
+
+    const otp = randomInt(100000, 999999).toString();
+    const otpExpiry = new Date(Date.now() + 8 * 60 * 1000); // 8 minutes.
+
+    await this.prisma.document.update({
+      where: { documentID: documentId },
+      data: {
+        pendingOwner: email,
+        otp,
+        otpExpiry,
+        otpAttemptCount: 0,
+      },
+    });
+
+    return { otp: otp };
   }
 }
