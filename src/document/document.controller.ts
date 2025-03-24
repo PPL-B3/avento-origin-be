@@ -18,14 +18,14 @@ export class DocumentController {
 
   constructor(
     private readonly service: DocumentService,
-    private readonly qrService: QrcodeService,
+    private readonly qrService: QrcodeService
   ) {}
 
   @Post("upload")
   @UseInterceptors(FileInterceptor("file"))
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File | null,
-    @Body() body: UploadDocumentDTO,
+    @Body() body: UploadDocumentDTO
   ) {
     if (!file) throw new BadRequestException("No file uploaded.");
     if (file.mimetype !== "application/pdf") {

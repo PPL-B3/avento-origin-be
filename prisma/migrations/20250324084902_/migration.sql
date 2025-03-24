@@ -24,10 +24,25 @@ CREATE TABLE "Document" (
     "documentName" TEXT NOT NULL,
     "filePath" TEXT NOT NULL,
     "uploadDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "ownerName" TEXT NOT NULL,
+    "publisher" TEXT NOT NULL,
 
     CONSTRAINT "Document_pkey" PRIMARY KEY ("documentID")
 );
 
+-- CreateTable
+CREATE TABLE "qrcodes" (
+    "id" TEXT NOT NULL,
+    "owner" TEXT NOT NULL,
+    "isPrivate" BOOLEAN NOT NULL,
+    "isActive" BOOLEAN NOT NULL,
+    "generatedDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "documentId" TEXT NOT NULL,
+
+    CONSTRAINT "qrcodes_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- AddForeignKey
+ALTER TABLE "qrcodes" ADD CONSTRAINT "qrcodes_documentId_fkey" FOREIGN KEY ("documentId") REFERENCES "Document"("documentID") ON DELETE RESTRICT ON UPDATE CASCADE;
