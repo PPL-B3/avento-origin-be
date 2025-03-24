@@ -2,10 +2,9 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { QrcodeService } from "./qrcode.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { BadRequestException } from "@nestjs/common";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 describe("QrcodeService", () => {
-  let qrService: QrcodeService;
+  let qrcodeService: QrcodeService;
   let prismaService: PrismaService;
 
   beforeEach(async () => {
@@ -16,7 +15,8 @@ describe("QrcodeService", () => {
           provide: PrismaService,
           useValue: {
             document: {
-              findUniqueOrThrow: jest.fn(),
+              findUnique: jest.fn(),
+              update: jest.fn(),
             },
             qRCode: {
               create: jest.fn(),
@@ -26,70 +26,71 @@ describe("QrcodeService", () => {
       ],
     }).compile();
 
-    qrService = module.get<QrcodeService>(QrcodeService);
+    qrcodeService = module.get<QrcodeService>(QrcodeService);
     prismaService = module.get<PrismaService>(PrismaService);
   });
 
-  it("should throw a bad request error if documentId is not found", async () => {
-    const docId = "123";
-    const owner = "owner";
-
-    jest.spyOn(prismaService.document, "findUniqueOrThrow").mockRejectedValue(
-      new PrismaClientKnownRequestError("", {
-        code: "P2025",
-        clientVersion: "6.5.0",
-      }),
-    );
-
-    await expect(qrService.generateQr(docId, owner)).rejects.toThrow(
-      new BadRequestException("No document found with such ID"),
-    );
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  it("should propegate error if exception code is other", async () => {
-    const docId = "123";
-    const owner = "owner";
+  it("harus melempar BadRequestException jika dokumen tidak ditemukan", async () => {
+    (prismaService.document.findUnique as jest.Mock).mockResolvedValue(null);
 
-    const err = new PrismaClientKnownRequestError("", {
-      code: "P6969",
-      clientVersion: "6.5.0",
+    await expect(qrcodeService.generateQr("doc1", "owner1")).rejects.toThrow(
+      BadRequestException
+    );
+    expect(prismaService.document.findUnique).toHaveBeenCalledWith({
+      where: { documentID: "doc1" },
     });
-
-    jest
-      .spyOn(prismaService.document, "findUniqueOrThrow")
-      .mockRejectedValue(err);
-
-    await expect(qrService.generateQr(docId, owner)).rejects.toThrow(err);
   });
 
-  it("should return private and public QR code IDs", async () => {
-    const mockDocument = {
-      documentID: "123",
-      documentName: "file",
-      filePath: "file.txt",
-      uploadDate: new Date(Date.now()),
-      publisher: "publisher",
-      qrCode: [],
-    };
-
-    const privateId = "private123";
-    const publicId = "public123";
-
-    jest
-      .spyOn(prismaService.document, "findUniqueOrThrow")
-      .mockResolvedValue(mockDocument);
-
-    const qrcode_create = jest.spyOn(prismaService.qRCode, "create");
-    qrcode_create.mockResolvedValueOnce({ id: privateId } as any);
-    qrcode_create.mockResolvedValueOnce({ id: publicId } as any);
-
-    const result = await qrService.generateQr(
-      mockDocument.documentID,
-      mockDocument.publisher,
+  it("harus membuat QR code dan mengupdate dokumen jika dokumen ada", async () => {
+    const mockDocument = { documentID: "doc1" };
+    (prismaService.document.findUnique as jest.Mock).mockResolvedValue(
+      mockDocument
     );
+    const mockPrivateQr = { id: "private1" };
+    const mockPublicQr = { id: "public1" };
+    (prismaService.qRCode.create as jest.Mock)
+      .mockResolvedValueOnce(mockPrivateQr)
+      .mockResolvedValueOnce(mockPublicQr);
+    (prismaService.document.update as jest.Mock).mockResolvedValue({});
+
+    const result = await qrcodeService.generateQr("doc1", "owner1");
+
+    expect(prismaService.document.findUnique).toHaveBeenCalledWith({
+      where: { documentID: "doc1" },
+    });
+    expect(prismaService.qRCode.create).toHaveBeenNthCalledWith(1, {
+      data: {
+        documentId: "doc1",
+        owner: "owner1",
+        isPrivate: true,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    expect(prismaService.qRCode.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        documentId: "doc1",
+        owner: "owner1",
+        isPrivate: false,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    expect(prismaService.document.update).toHaveBeenCalledWith({
+      where: { documentID: "doc1" },
+      data: {
+        qrCode: {
+          connect: [{ id: mockPrivateQr.id }, { id: mockPublicQr.id }],
+        },
+      },
+    });
     expect(result).toEqual({
-      privateId: privateId,
-      publicId: publicId,
+      privateId: mockPrivateQr.id,
+      publicId: mockPublicQr.id,
     });
   });
 });
