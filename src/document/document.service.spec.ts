@@ -102,7 +102,7 @@ describe("DocumentService", () => {
     jest.spyOn(configService, "get").mockReturnValueOnce(undefined);
 
     await expect(
-      service.uploadToBucket(mockFile, mockBody, Date.now())
+      service.uploadToBucket(mockFile, mockBody, Date.now()),
     ).rejects.toThrow("DO_SPACES_BUCKET environment variable is not defined.");
   });
 
@@ -130,7 +130,7 @@ describe("DocumentService", () => {
     } as any);
 
     await expect(
-      service.uploadToBucket(mockFile, mockBody, Date.now())
+      service.uploadToBucket(mockFile, mockBody, Date.now()),
     ).rejects.toThrow("S3 Upload Failed");
   });
 
@@ -160,7 +160,7 @@ describe("DocumentService", () => {
       .mockRejectedValueOnce(new Error("Database Error"));
 
     await expect(service.uploadDocument(mockFile, mockBody)).rejects.toThrow(
-      "Database Error"
+      "Database Error",
     );
   });
 });
