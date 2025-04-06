@@ -69,6 +69,7 @@ describe("QrcodeService", () => {
       filePath: "file.txt",
       uploadDate: new Date(Date.now()),
       publisher: "publisher",
+      ownerCount: 1,
       qrCode: [],
     };
 

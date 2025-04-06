@@ -26,6 +26,7 @@ export class QrcodeService {
         owner: ownerName,
         isPrivate: true,
         isActive: true,
+        ownerNumber: 1,
       },
       select: {
         id: true,
@@ -38,6 +39,7 @@ export class QrcodeService {
         owner: ownerName,
         isPrivate: false,
         isActive: true,
+        ownerNumber: 1,
       },
       select: {
         id: true,
