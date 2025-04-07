@@ -3,12 +3,15 @@ import * as path from "path";
 import {
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
+  ParseUUIDPipe,
 } from "@nestjs/common";
 import { DocumentController } from "./document.controller";
 import { DocumentService } from "./document.service";
 import { Test, TestingModule } from "@nestjs/testing";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
 import { QrcodeService } from "../qrcode/qrcode.service";
+import { PrismaModule } from "../prisma/prisma.module";
 
 describe("DocumentController", () => {
   let controller: DocumentController;
@@ -19,6 +22,7 @@ describe("DocumentController", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [PrismaModule],
       controllers: [DocumentController],
       providers: [
         {
@@ -28,6 +32,7 @@ describe("DocumentController", () => {
               message: "Document uploaded successfully.",
               url: "https://mock-url.com/document.pdf",
             }),
+            viewDocument: jest.fn(),
           },
         },
         {
@@ -139,5 +144,31 @@ describe("DocumentController", () => {
     await expect(
       controller.uploadDocument(mockValidFile, mockBody),
     ).rejects.toThrow(new InternalServerErrorException("S3 Upload Failed"));
+  });
+
+  it("should return result from service (positive case)", async () => {
+    const qrId = "valid-uuid";
+    const expectedResult = {
+      documentName: "Test Document",
+      uploadDate: new Date(),
+      publisher: "Test Publisher",
+      ownershipHistory: [{ owner: "Owner1", generatedDate: new Date() }],
+      currentOwner: "Owner1",
+      filePath: "/test/path.pdf",
+    };
+    jest.spyOn(service, "viewDocument").mockResolvedValue(expectedResult);
+
+    const result = await controller.viewDocument(qrId);
+    expect(result).toEqual(expectedResult);
+  });
+
+  it("should throw NotFoundException when the service throws one", async () => {
+    const qrId = "valid-uuid";
+    jest
+      .spyOn(service, "viewDocument")
+      .mockRejectedValue(new NotFoundException("QR code not found"));
+    await expect(controller.viewDocument(qrId)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 });

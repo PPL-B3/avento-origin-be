@@ -35,11 +35,12 @@ model User {
 }
 
 model Document {
-  documentID   String     @id @default(uuid())
+  documentID   String   @id @default(uuid())
   documentName String
   filePath     String
-  uploadDate   DateTime   @default(now())
+  uploadDate   DateTime @default(now())
   publisher    String
+  ownerCount   Int
   qrCode       QRCode[]
   AuditLog     AuditLog[]
 }
@@ -50,6 +51,7 @@ model QRCode {
   isPrivate     Boolean
   isActive      Boolean
   generatedDate DateTime @default(now())
+  ownerNumber   Int
 
   document   Document @relation(fields: [documentId], references: [documentID])
   documentId String

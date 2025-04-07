@@ -2,7 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   InternalServerErrorException,
+  Param,
+  ParseUUIDPipe,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -17,6 +20,7 @@ import {
   ApiOperation,
   ApiResponse,
 } from "@nestjs/swagger";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Controller("documents")
 export class DocumentController {
@@ -25,6 +29,7 @@ export class DocumentController {
   constructor(
     private readonly service: DocumentService,
     private readonly qrService: QrcodeService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   @Post("upload")
@@ -90,5 +95,10 @@ export class DocumentController {
     } catch (error) {
       throw new InternalServerErrorException(error.message);
     }
+  }
+
+  @Get("view/:qrId")
+  async viewDocument(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
+    return await this.service.viewDocument(qrId);
   }
 }
