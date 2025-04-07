@@ -1,27 +1,26 @@
-import { addAuditLog } from "./auditLog.service";
+import { AuditLogService } from "./auditLog.service";
+import { PrismaService } from "../prisma/prisma.service";
 
-jest.mock("@prisma/client", () => {
-  const mockPrisma = {
-    auditLog: {
-      create: jest.fn(),
-    },
-  };
-  return {
-    PrismaClient: jest.fn(() => mockPrisma),
-    prisma: mockPrisma,
-  };
-});
-
-describe("addAuditLog", () => {
-  const mockPrisma = require("@prisma/client").prisma;
+describe("AuditLogService", () => {
+  let auditLogService: AuditLogService;
+  let mockPrisma: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    mockPrisma = {
+      auditLog: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
+    };
+
+    const mockPrismaService = mockPrisma as unknown as PrismaService;
+
+    auditLogService = new AuditLogService(mockPrismaService);
   });
 
   it("should add audit log with documentID (positive test)", async () => {
     const mockLog = {
-      id: "1",
+      logID: "1",
       eventType: "CREATE",
       userID: "user1",
       details: "Some details",
@@ -30,7 +29,7 @@ describe("addAuditLog", () => {
 
     mockPrisma.auditLog.create.mockResolvedValue(mockLog);
 
-    const result = await addAuditLog({
+    const result = await auditLogService.addAuditLog({
       eventType: "CREATE",
       userID: "user1",
       details: "Some details",
@@ -50,7 +49,7 @@ describe("addAuditLog", () => {
 
   it("should add audit log without documentID (branch coverage)", async () => {
     const mockLog = {
-      id: "2",
+      logID: "2",
       eventType: "DELETE",
       userID: "user2",
       details: "No documentID provided",
@@ -59,7 +58,7 @@ describe("addAuditLog", () => {
 
     mockPrisma.auditLog.create.mockResolvedValue(mockLog);
 
-    const result = await addAuditLog({
+    const result = await auditLogService.addAuditLog({
       eventType: "DELETE",
       userID: "user2",
       details: "No documentID provided",
@@ -81,14 +80,38 @@ describe("addAuditLog", () => {
     mockPrisma.auditLog.create.mockRejectedValue(mockError);
 
     await expect(
-      addAuditLog({
+      auditLogService.addAuditLog({
         eventType: "ERROR",
         userID: "user3",
         details: "Something went wrong",
       }),
     ).rejects.toThrow("Database error");
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("should return all audit logs ordered by timestamp desc", async () => {
+    const mockLogs = [{ logID: "1" }, { logID: "2" }];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
+
+    const result = await auditLogService.getAllAuditLogs();
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
+      select: {
+        logID: true,
+        eventType: true,
+        timestamp: true,
+        userID: true,
+        documentID: true,
+        details: true,
+      },
+      orderBy: {
+        timestamp: "desc",
+      },
+    });
+
+    expect(result).toBe(mockLogs);
   });
 });
