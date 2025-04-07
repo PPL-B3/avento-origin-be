@@ -17,11 +17,23 @@ services:
       - DO_SPACES_SECRET
       - GMAIL_USER
       - GMAIL_PASS
+      - FE_URL
     ports:
       - "4000:4000"
+    networks:
+      - public
+      - internal
 
   database:
     environment:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
       - POSTGRES_DB
+    networks:
+      - internal
+
+networks:
+  public:
+    driver: bridge
+  internal:
+    internal: true
