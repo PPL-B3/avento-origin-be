@@ -17,6 +17,7 @@ describe("QrcodeService", () => {
           useValue: {
             document: {
               findUniqueOrThrow: jest.fn(),
+              update: jest.fn(),
             },
             qRCode: {
               create: jest.fn(),

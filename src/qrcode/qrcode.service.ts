@@ -7,8 +7,9 @@ export class QrcodeService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async generateQr(documentId: string, ownerName: string) {
+    let document;
     try {
-      await this.prismaService.document.findUniqueOrThrow({
+      document = await this.prismaService.document.findUniqueOrThrow({
         where: { documentID: documentId },
       });
     } catch (err) {
@@ -26,7 +27,7 @@ export class QrcodeService {
         owner: ownerName,
         isPrivate: true,
         isActive: true,
-        ownerNumber: 1,
+        ownerNumber: document.ownerCount + 1,
       },
       select: {
         id: true,
@@ -39,10 +40,21 @@ export class QrcodeService {
         owner: ownerName,
         isPrivate: false,
         isActive: true,
-        ownerNumber: 1,
+        ownerNumber: document.ownerCount + 1,
       },
       select: {
         id: true,
+      },
+    });
+
+    await this.prismaService.document.update({
+      where: {
+        documentID: documentId,
+      },
+      data: {
+        ownerCount: {
+          increment: 1,
+        },
       },
     });
 
