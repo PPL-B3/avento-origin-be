@@ -1,11 +1,22 @@
+// documents.module.ts
 import { Module } from "@nestjs/common";
-import { DocumentController } from "./document.controller";
-import { DocumentService } from "./document.service";
-import { QrcodeModule } from "../qrcode/qrcode.module";
+import { DocumentController } from "./controllers/document.controller";
+import { DocumentService } from "./services/document.service";
+import { S3StorageService } from "./services/s3-storage.service";
+import { EmailService } from "./services/email.service";
+import { DocumentRepository } from "./repositories/document.repository";
+import { PrismaService } from "../prisma/prisma.service";
+import { ConfigService } from "@nestjs/config";
 
 @Module({
   controllers: [DocumentController],
-  providers: [DocumentService],
-  imports: [QrcodeModule],
+  providers: [
+    DocumentService,
+    S3StorageService,
+    EmailService,
+    DocumentRepository,
+    PrismaService,
+    ConfigService,
+  ],
 })
-export class DocumentModule {}
+export class DocumentsModule {}

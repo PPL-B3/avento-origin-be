@@ -40,23 +40,26 @@ model Document {
   filePath     String
   uploadDate   DateTime @default(now())
   publisher    String
-  ownerCount   Int
-  qrCode       QRCode[]
+  qrCode       QrCode[]
   AuditLog     AuditLog[]
+
+  pendingOwner    String?
+  otp             String?
+  otpExpiry       DateTime?
+  otpAttemptCount Int @default(0)
 }
 
-model QRCode {
-  id            String   @id @default(uuid())
-  owner         String
-  isPrivate     Boolean
-  isActive      Boolean
-  generatedDate DateTime @default(now())
-  ownerNumber   Int
+model QrCode {
+    id String @id @default(uuid())
+    owner String
+    isPrivate Boolean
+    isActive Boolean
+    generatedDate DateTime @default(now())
 
-  document   Document @relation(fields: [documentId], references: [documentID])
-  documentId String
+    document Document @relation(fields: [documentId], references: [documentID])
+    documentId String
 
-  @@map("qrcodes")
+    @@map("qrcodes")
 }
 
 model AuditLog {

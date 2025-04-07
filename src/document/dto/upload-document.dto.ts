@@ -1,5 +1,5 @@
+import { IsEmail, IsNotEmpty } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty } from "class-validator";
 
 export class UploadDocumentDTO {
   @ApiProperty()
@@ -7,6 +7,7 @@ export class UploadDocumentDTO {
   documentName: string;
 
   @ApiProperty()
+  @IsEmail()
   @IsNotEmpty()
   ownerName: string;
 }
