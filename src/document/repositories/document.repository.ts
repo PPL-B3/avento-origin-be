@@ -46,7 +46,7 @@ export class DocumentRepository {
     transactions: Prisma.TransactionClient,
     owner: string,
     documentId: string,
-  ): Promise<{ privateId: string; publicId: string }> {
+  ): Promise<{ privateId: string; publicId: string; documentId: string }> {
     const qrCodeBatch = this.createQrCodeBatch(owner, documentId);
 
     const qrCodes = await Promise.all(
@@ -68,6 +68,7 @@ export class DocumentRepository {
     return {
       privateId: privateQr.id,
       publicId: publicQr.id,
+      documentId: documentId,
     };
   }
 

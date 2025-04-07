@@ -11,6 +11,7 @@ import { PrismaService } from "./prisma/prisma.service";
 import { AuthModule } from "./auth/auth.module";
 // import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 import { ConfigModule } from "@nestjs/config";
+import { AuditLogModule } from "./auditLog/auditLog.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ConfigModule } from "@nestjs/config";
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    AuditLogModule,
   ],
   providers: [PrismaService],
 })

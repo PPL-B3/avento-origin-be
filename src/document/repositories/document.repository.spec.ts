@@ -63,6 +63,7 @@ describe("DocumentRepository", () => {
         },
       });
       expect(result).toEqual({
+        documentId: "doc-123",
         privateId: "qr-private",
         publicId: "qr-public",
       });
@@ -176,6 +177,7 @@ describe("DocumentRepository", () => {
         },
       });
       expect(result).toEqual({
+        documentId: "doc-123",
         privateId: "new-private",
         publicId: "new-public",
       });
@@ -291,7 +293,7 @@ describe("DocumentRepository", () => {
       fakeTransaction.document.update.mockResolvedValue({});
       const result = await repo.createDocument(createInput);
       expect(createQrCodeBatchSpy).toHaveBeenCalledWith("testOwner", "doc-123");
-      expect(result).toEqual({ privateId: "qr-2", publicId: "qr-1" });
+      expect(result).toEqual({ privateId: "qr-2", publicId: "qr-1", documentId: "doc-123" });
     });
   });
 });

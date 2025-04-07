@@ -6,10 +6,12 @@ import * as argon from "argon2";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "./jwt/jwt.service";
+import { AuditLogService } from "../auditLog/auditLog.service";
 
 describe("AuthService", () => {
   let authService: AuthService;
   let prismaService: PrismaService;
+  let auditLogService: AuditLogService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -31,11 +33,18 @@ describe("AuthService", () => {
             generateToken: jest.fn().mockReturnValue("mocked-jwt-token"),
           },
         },
+        {
+          provide: AuditLogService,
+          useValue: {
+            addAuditLog: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     authService = module.get<AuthService>(AuthService);
     prismaService = module.get<PrismaService>(PrismaService);
+    auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
   afterEach(() => {
@@ -43,18 +52,44 @@ describe("AuthService", () => {
   });
 
   describe("logout", () => {
-    it("should update lastLogout and return success response", async () => {
+    it("should update lastLogout, add audit log and return success response", async () => {
       const userId = "123";
+      const userEmail = "user@example.com";
 
-      const updateSpy = jest
-        .spyOn(prismaService.user, "update")
-        .mockResolvedValueOnce({} as any); // bisa juga mock user object jika perlu
+      const updateSpy = jest.spyOn(prismaService.user, "update");
+      const findUniqueSpy = jest
+        .spyOn(prismaService.user, "findUnique")
+        .mockResolvedValue({
+          email: "user@example.com",
+        } as any);
+      const auditLogSpy = jest
+        .spyOn(auditLogService, "addAuditLog")
+        .mockResolvedValue({
+          logID: "mock-log-id",
+          eventType: "LOGOUT",
+          timestamp: new Date(),
+          userID: "mock-user-id",
+          documentID: null,
+          details: "User with email test@example.com logged out.",
+        });
 
       const result = await authService.logout(userId);
 
+      expect(findUniqueSpy).toHaveBeenCalledWith({
+        where: { id: userId },
+        select: { email: true },
+      });
+
       expect(updateSpy).toHaveBeenCalledWith({
         where: { id: userId },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: { lastLogout: expect.any(BigInt) },
+      });
+
+      expect(auditLogSpy).toHaveBeenCalledWith({
+        eventType: "LOGOUT",
+        userID: userId,
+        details: `User with email ${userEmail} logged out.`,
       });
 
       expect(result).toEqual({
@@ -330,6 +365,29 @@ describe("AuthService", () => {
       await expect(authService.register(dto)).rejects.toThrow(
         BadRequestException,
       );
+    });
+    it("should still return success even if audit log fails", async () => {
+      const userId = "test-user-id";
+
+      // Mock user found
+      jest.spyOn(prismaService.user, "findUnique").mockResolvedValue({
+        email: "user@example.com",
+      } as any);
+
+      // Mock user update (lastLogout)
+      jest.spyOn(prismaService.user, "update").mockResolvedValue({} as any);
+
+      // Force audit log to fail
+      jest
+        .spyOn(auditLogService, "addAuditLog")
+        .mockRejectedValueOnce(new Error("Audit log failed"));
+
+      const result = await authService.logout(userId);
+
+      expect(result).toEqual({
+        success: true,
+        message: "Berhasil logout",
+      });
     });
   });
 });

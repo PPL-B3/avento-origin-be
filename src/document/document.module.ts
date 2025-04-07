@@ -7,8 +7,10 @@ import { EmailService } from "./services/email.service";
 import { DocumentRepository } from "./repositories/document.repository";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConfigService } from "@nestjs/config";
+import { AuditLogModule } from "../auditLog/auditLog.module";
 
 @Module({
+  imports: [AuditLogModule],
   controllers: [DocumentController],
   providers: [
     DocumentService,
