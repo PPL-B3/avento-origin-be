@@ -211,7 +211,7 @@ describe("DocumentService", () => {
       data: {
         documentName: mockBody.documentName,
         filePath: "https://mock-url.com/document.pdf",
-        ownerCount: 1,
+        ownerCount: 0,
         uploadDate: expect.any(Date),
         publisher: mockBody.ownerName,
       },
@@ -239,13 +239,11 @@ describe("DocumentService", () => {
       .mockResolvedValue(mockRelatedQRCodes);
 
     const result = await docService.viewDocument(privateId);
+    expect(result.documentId).toEqual(mockDocument.documentID);
     expect(result.documentName).toEqual(mockDocument.documentName);
     expect(result.publisher).toEqual(mockDocument.publisher);
-    // Ownership history should have one unique event based on ownershipSequence.
     expect(result.ownershipHistory.length).toBe(1);
-    // The current owner is determined by the active QR code.
     expect(result.currentOwner).toEqual("Owner1");
-    // Since the initial QR code is private, filePath is included.
     expect(result.filePath).toEqual(mockDocument.filePath);
   });
 
