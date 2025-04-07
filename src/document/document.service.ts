@@ -75,7 +75,14 @@ export class DocumentService {
 
     // Retrieve all QR codes associated with the same document.
     const relatedQRCodes = await this.prisma.qRCode.findMany({
-      where: { documentId: qrCode.documentId },
+      where: {
+        documentId: qrCode.documentId,
+        NOT: {
+          id: {
+            equals: qrCode.id,
+          },
+        },
+      },
     });
 
     // Group QR codes by ownerNumber.
