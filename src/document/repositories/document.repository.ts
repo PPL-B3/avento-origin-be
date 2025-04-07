@@ -78,7 +78,13 @@ export class DocumentRepository {
   ) {
     const document = await transaction.document.findUnique({
       where: { documentID: documentId },
-      include: { qrCode: true },
+      include: {
+        qrCode: {
+          orderBy: {
+            generatedDate: "asc",
+          },
+        },
+      },
     });
     if (!document) throw new BadRequestException("Document not found.");
     return document;

@@ -94,7 +94,13 @@ describe("DocumentRepository", () => {
       // Assert: expect prisma.document.findUnique to have been called with the proper parameters.
       expect(prisma.document.findUnique).toHaveBeenCalledWith({
         where: { documentID: documentId },
-        include: { qrCode: true },
+        include: {
+          qrCode: {
+            orderBy: {
+              generatedDate: "asc",
+            },
+          },
+        },
       });
       expect(result).toEqual(fakeDoc);
     });
@@ -155,7 +161,13 @@ describe("DocumentRepository", () => {
       );
       expect(fakeTransaction.document.findUnique).toHaveBeenCalledWith({
         where: { documentID: documentId },
-        include: { qrCode: true },
+        include: {
+          qrCode: {
+            orderBy: {
+              generatedDate: "asc",
+            },
+          },
+        },
       });
       expect(fakeTransaction.qrCode.update).toHaveBeenCalledTimes(2);
       expect(fakeTransaction.document.update).toHaveBeenCalledWith({
@@ -199,7 +211,13 @@ describe("DocumentRepository", () => {
       const result = await repo.findDocumentById(documentId, fakeTransaction);
       expect(fakeTransaction.document.findUnique).toHaveBeenCalledWith({
         where: { documentID: documentId },
-        include: { qrCode: true },
+        include: {
+          qrCode: {
+            orderBy: {
+              generatedDate: "asc",
+            },
+          },
+        },
       });
       expect(result).toEqual(fakeDoc);
     });
