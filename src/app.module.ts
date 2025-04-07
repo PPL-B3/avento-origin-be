@@ -11,7 +11,6 @@ import { PrismaService } from "./prisma/prisma.service";
 import { AuthModule } from "./auth/auth.module";
 // import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 import { ConfigModule } from "@nestjs/config";
-import { QrcodeModule } from "./qrcode/qrcode.module";
 import { AuditLogModule } from "./auditLog/auditLog.module";
 
 @Module({
@@ -23,7 +22,6 @@ import { AuditLogModule } from "./auditLog/auditLog.module";
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    QrcodeModule,
     AuditLogModule,
   ],
   providers: [PrismaService],

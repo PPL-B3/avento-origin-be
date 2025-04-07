@@ -5,6 +5,7 @@ import { EmailService } from "./email.service";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
+import { AuditLogService } from "../../auditLog/auditLog.service";
 
 describe("DocumentService", () => {
   let service: DocumentService;
@@ -13,6 +14,7 @@ describe("DocumentService", () => {
   let email: jest.Mocked<EmailService>;
   let config: jest.Mocked<ConfigService>;
   let prisma: jest.Mocked<PrismaService>;
+  let auditLog: jest.Mocked<AuditLogService>;
 
   beforeEach(() => {
     s3Storage = { uploadPDF: jest.fn() } as any;
@@ -27,12 +29,25 @@ describe("DocumentService", () => {
     // For simplicity, let $transaction just call the passed callback with a dummy transaction (here, using prisma as the transaction client)
     prisma = {
       $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
+      user: {
+        findUnique: jest.fn(),
+      },
       qrCode: {
         findUnique: jest.fn(),
       },
     } as any;
+    auditLog = {
+      addAuditLog: jest.fn(),
+    } as any;
 
-    service = new DocumentService(s3Storage, repo, email, config, prisma);
+    service = new DocumentService(
+      s3Storage,
+      repo,
+      email,
+      config,
+      prisma,
+      auditLog,
+    );
   });
 
   describe("uploadDocument", () => {
@@ -42,6 +57,7 @@ describe("DocumentService", () => {
       repo.createDocument.mockResolvedValue({
         privateId: "new-qr-private",
         publicId: "new-qr-public",
+        documentId: "new-document-id",
       });
 
       const file = {
@@ -55,7 +71,7 @@ describe("DocumentService", () => {
         file.buffer,
         file.mimetype,
         "bucket-name",
-        expect.stringMatching(/^Alice_My-Doc_\d+\.pdf$/)
+        expect.stringMatching(/^Alice_My-Doc_\d+\.pdf$/),
       );
       expect(repo.createDocument).toHaveBeenCalled();
       expect(result).toEqual({
@@ -67,14 +83,66 @@ describe("DocumentService", () => {
     it("throws if bucket is not configured", async () => {
       config.get.mockReturnValue(undefined);
       await expect(
-        service.uploadDocument({} as any, { documentName: "x", ownerName: "y" })
+        service.uploadDocument({} as any, {
+          documentName: "x",
+          ownerName: "y",
+        }),
       ).rejects.toThrow("DO_SPACES_BUCKET is not configured");
+    });
+
+    it("adds audit log if user exists", async () => {
+      config.get.mockReturnValue("bucket-name");
+      s3Storage.uploadPDF.mockResolvedValue("http://example.com/file.pdf");
+      repo.createDocument.mockResolvedValue({
+        privateId: "new-qr-private",
+        publicId: "new-qr-public",
+        documentId: "new-document-id",
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-id-123",
+      });
+
+      const file = {
+        buffer: Buffer.from("pdf"),
+        mimetype: "application/pdf",
+      } as any;
+      const dto = { documentName: "Audit Doc", ownerName: "alice@example.com" };
+
+      await service.uploadDocument(file, dto);
+
+      expect(auditLog.addAuditLog).toHaveBeenCalledWith({
+        eventType: "UPLOAD_DOCUMENT",
+        userID: "user-id-123",
+        details: 'Document "Audit Doc" uploaded.',
+        documentID: "new-document-id",
+      });
+    });
+
+    it("does not add audit log if user is not found", async () => {
+      config.get.mockReturnValue("bucket-name");
+      s3Storage.uploadPDF.mockResolvedValue("http://example.com/file.pdf");
+      repo.createDocument.mockResolvedValue({
+        privateId: "new-qr-private",
+        publicId: "new-qr-public",
+        documentId: "new-document-id",
+      });
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null); // simulate user not found
+
+      const file = {
+        buffer: Buffer.from("pdf"),
+        mimetype: "application/pdf",
+      } as any;
+      const dto = { documentName: "No Audit", ownerName: "ghost@example.com" };
+
+      await service.uploadDocument(file, dto);
+
+      expect(auditLog.addAuditLog).not.toHaveBeenCalled();
     });
   });
 
   describe("transferDocument", () => {
     it("sends transfer email and updates document with OTP", async () => {
-      // Provide a minimal document with all required fields
+      // Mock return dari findDocumentById
       repo.findDocumentById.mockResolvedValue({
         documentID: "doc-id",
         documentName: "My Doc",
@@ -104,12 +172,20 @@ describe("DocumentService", () => {
           },
         ],
       });
+
+      // Mock updateDocument
       repo.updateDocument.mockResolvedValue({} as any);
+
+      // Cast prisma.user.findUnique sebagai mock dan mock hasilnya
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+        id: "user-id-123",
+      });
 
       const result = await service.transferDocument(
         "doc-id",
-        "newowner@example.com"
+        "newowner@example.com",
       );
+
       expect(result.otp).toHaveLength(6);
       expect(repo.updateDocument).toHaveBeenCalledWith(
         "doc-id",
@@ -118,15 +194,24 @@ describe("DocumentService", () => {
           otp: expect.any(String),
           otpExpiry: expect.any(Date),
           otpAttemptCount: 0,
-        })
+        }),
       );
+
       expect(email.sendOwnershipTransferEmail).toHaveBeenCalledWith(
         "newowner@example.com",
         "My Doc",
         "currentOwner",
         "Alice",
-        "doc-id"
+        "doc-id",
       );
+
+      expect(auditLog.addAuditLog).toHaveBeenCalledWith({
+        eventType: "TRANSFER_OWNERSHIP",
+        userID: "user-id-123",
+        details:
+          'Ownership transfer initiated for document "My Doc" to newowner@example.com',
+        documentID: "doc-id",
+      });
     });
   });
 
@@ -167,6 +252,7 @@ describe("DocumentService", () => {
       repo.changeOwnership.mockResolvedValue({
         privateId: "new-qr-private",
         publicId: "new-qr-public",
+        documentId: "new-document-id",
       });
       // updateDocument is used to clear transfer data – we cast the update payload to any to bypass TS error.
       repo.updateDocument.mockResolvedValue({} as any);
@@ -182,9 +268,10 @@ describe("DocumentService", () => {
           otpExpiry: null,
           otpAttemptCount: 0,
         } as any,
-        prisma
+        prisma,
       );
       expect(result).toEqual({
+        documentId: "new-document-id",
         privateId: "new-qr-private",
         publicId: "new-qr-public",
       });
@@ -196,7 +283,7 @@ describe("DocumentService", () => {
         pendingOwner: null,
       });
       await expect(service.claimDocument("doc-id", "123456")).rejects.toThrow(
-        "No pending transfer."
+        "No pending transfer.",
       );
     });
 
@@ -206,7 +293,7 @@ describe("DocumentService", () => {
         otpExpiry: new Date(Date.now() - 1000),
       });
       await expect(service.claimDocument("doc-id", "123456")).rejects.toThrow(
-        "OTP expired."
+        "OTP expired.",
       );
     });
 
@@ -216,7 +303,7 @@ describe("DocumentService", () => {
         otpAttemptCount: 4,
       });
       await expect(service.claimDocument("doc-id", "123456")).rejects.toThrow(
-        "Too many failed attempts."
+        "Too many failed attempts.",
       );
     });
 
@@ -224,7 +311,7 @@ describe("DocumentService", () => {
       repo.findDocumentById.mockResolvedValue({ ...baseDoc, otp: "999999" });
       repo.updateDocument.mockResolvedValue({} as any);
       await expect(service.claimDocument("doc-id", "000000")).rejects.toThrow(
-        "Incorrect OTP."
+        "Incorrect OTP.",
       );
       expect(repo.updateDocument).toHaveBeenCalledWith("doc-id", {
         otpAttemptCount: { increment: 1 },

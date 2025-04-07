@@ -1,11 +1,16 @@
 import { ConfigService } from "@nestjs/config";
 import { DocumentRepository } from "../repositories/document.repository";
 import { EmailService } from "./email.service";
-import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
 import { S3StorageService } from "./s3-storage.service";
 import { UploadDocumentDTO } from "../dto/upload-document.dto";
 import { randomInt } from "crypto";
 import { PrismaService } from "../../prisma/prisma.service";
+import { AuditLogService } from "../../auditLog/auditLog.service";
 
 @Injectable()
 export class DocumentService {
@@ -15,6 +20,7 @@ export class DocumentService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async uploadDocument(pdf: Express.Multer.File, dto: UploadDocumentDTO) {
@@ -28,12 +34,30 @@ export class DocumentService {
       filename,
     );
 
-    return this.documentRepo.createDocument({
+    const createdDocument = await this.documentRepo.createDocument({
       documentName: dto.documentName,
       filePath: url,
       uploadDate: new Date(),
       publisher: dto.ownerName,
     });
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.ownerName },
+    });
+
+    if (user) {
+      await this.auditLogService.addAuditLog({
+        eventType: "UPLOAD_DOCUMENT",
+        userID: user.id,
+        details: `Document "${dto.documentName}" uploaded.`,
+        documentID: createdDocument.documentId,
+      });
+    }
+
+    return {
+      privateId: createdDocument.privateId,
+      publicId: createdDocument.publicId,
+    };
   }
 
   async transferDocument(documentId: string, pendingOwner: string) {
@@ -46,6 +70,17 @@ export class DocumentService {
       otpExpiry: new Date(Date.now() + 8 * 60 * 1000), // 8 minutes.
       otpAttemptCount: 0,
     });
+    const user = await this.prisma.user.findUnique({
+      where: { email: document.publisher },
+    });
+    if(user) {
+      await this.auditLogService.addAuditLog({
+        eventType: "TRANSFER_OWNERSHIP",
+        userID: user.id,
+        details: `Ownership transfer initiated for document "${document.documentName}" to ${pendingOwner}`,
+        documentID: documentId,
+      });
+    }
 
     await this.emailService.sendOwnershipTransferEmail(
       pendingOwner,
@@ -89,6 +124,13 @@ export class DocumentService {
         updateData,
         transaction,
       );
+
+      await this.auditLogService.addAuditLog({
+        eventType: "CLAIM_DOCUMENT",
+        userID: document.pendingOwner,
+        details: `Document "${document.documentName}" successfully claimed.`,
+        documentID: documentId,
+      });
 
       return qrCodeIds;
     });
@@ -171,7 +213,7 @@ export class DocumentService {
 
     // Convert the map to an array sorted by generatedDate ascending.
     const ownershipHistory = Array.from(ownershipMap.values()).sort(
-      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime()
+      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime(),
     );
 
     const response: any = {
