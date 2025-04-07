@@ -18,6 +18,7 @@ services:
       - DO_SPACES_SECRET
       - GMAIL_USER
       - GMAIL_PASS
+      - FE_URL=http://localhost:3000
     ports:
       - "4000:4000"
 

@@ -17,6 +17,7 @@ services:
       - DO_SPACES_SECRET
       - GMAIL_USER
       - GMAIL_PASS
+      - FE_URL
     ports:
       - "4000:4000"
     networks:
