@@ -40,6 +40,11 @@ model Document {
   publisher    String
   ownerCount   Int
   qrCode       QRCode[]
+
+  pendingOwner     String?
+  otp             String?
+  otpExpiry       DateTime?
+  otpAttemptCount Int @default(0)
 }
 
 model QRCode {

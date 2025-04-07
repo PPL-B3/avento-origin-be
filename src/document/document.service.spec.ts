@@ -6,10 +6,7 @@ import { DocumentService } from "./document.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { Test, TestingModule } from "@nestjs/testing";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
-import {
-  GetBucketOwnershipControlsCommand,
-  OwnerOverride,
-} from "@aws-sdk/client-s3";
+import { BadRequestException } from "@nestjs/common/exceptions";
 import { NotFoundException } from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
@@ -27,7 +24,7 @@ jest.mock("aws-sdk", () => {
 });
 
 describe("DocumentService", () => {
-  let service: DocumentService;
+  let docService: DocumentService;
   let configService: ConfigService;
   let prismaService: PrismaService;
   let mockFile: Express.Multer.File;
@@ -35,12 +32,16 @@ describe("DocumentService", () => {
   let bucket: AWS.S3;
 
   const mockDocument = {
-    documentID: "123",
-    documentName: "file",
-    filePath: "file.txt",
-    uploadDate: new Date(Date.now()),
-    publisher: "publisher",
+    documentID: "doc-id",
+    documentName: "Test Document",
+    filePath: "https://example.com/doc.pdf",
+    uploadDate: new Date(),
+    publisher: "John Doe",
     ownerCount: 1,
+    pendingOwner: null,
+    otp: null,
+    otpExpiry: null,
+    otpAttemptCount: 0,
     qrCode: [],
   };
 
@@ -112,6 +113,8 @@ describe("DocumentService", () => {
                 ownerCount: 1,
                 publisher: "John Doe",
               }),
+              findUnique: jest.fn(),
+              update: jest.fn(),
             },
             qRCode: {
               findUnique: jest.fn(),
@@ -122,7 +125,7 @@ describe("DocumentService", () => {
       ],
     }).compile();
 
-    service = module.get<DocumentService>(DocumentService);
+    docService = module.get<DocumentService>(DocumentService);
     configService = module.get<ConfigService>(ConfigService);
     prismaService = module.get<PrismaService>(PrismaService);
     bucket = new AWS.S3();
@@ -154,20 +157,20 @@ describe("DocumentService", () => {
   });
 
   it("should be defined", () => {
-    expect(service).toBeDefined();
+    expect(docService).toBeDefined();
   });
 
   it("should throw an error if DO_SPACES_BUCKET is not set", async () => {
     jest.spyOn(configService, "get").mockReturnValueOnce(undefined);
 
     await expect(
-      service.uploadToBucket(mockFile, mockBody, Date.now()),
+      docService.uploadToBucket(mockFile, mockBody, Date.now())
     ).rejects.toThrow("DO_SPACES_BUCKET environment variable is not defined.");
   });
 
   it("should upload a file to S3 and return the URL", async () => {
     const timestamp = Date.now();
-    const url = await service.uploadToBucket(mockFile, mockBody, timestamp);
+    const url = await docService.uploadToBucket(mockFile, mockBody, timestamp);
 
     expect(url).toBe("https://mock-url.com/document.pdf");
 
@@ -189,12 +192,12 @@ describe("DocumentService", () => {
     } as any);
 
     await expect(
-      service.uploadToBucket(mockFile, mockBody, Date.now()),
+      docService.uploadToBucket(mockFile, mockBody, Date.now())
     ).rejects.toThrow("S3 Upload Failed");
   });
 
   it("should store document info in the database after upload", async () => {
-    const response = await service.uploadDocument(mockFile, mockBody);
+    const response = await docService.uploadDocument(mockFile, mockBody);
 
     expect(response).toEqual({
       documentName: mockBody.documentName,
@@ -220,7 +223,7 @@ describe("DocumentService", () => {
       .spyOn(prismaService.document, "create")
       .mockRejectedValueOnce(new Error("Database Error"));
 
-    await expect(service.uploadDocument(mockFile, mockBody)).rejects.toThrow(
+    await expect(docService.uploadDocument(mockFile, mockBody)).rejects.toThrow(
       "Database Error",
     );
   });
@@ -235,7 +238,7 @@ describe("DocumentService", () => {
       .spyOn(prismaService.qRCode, "findMany")
       .mockResolvedValue(mockRelatedQRCodes);
 
-    const result = await service.viewDocument(privateId);
+    const result = await docService.viewDocument(privateId);
     expect(result.documentName).toEqual(mockDocument.documentName);
     expect(result.publisher).toEqual(mockDocument.publisher);
     // Ownership history should have one unique event based on ownershipSequence.
@@ -260,7 +263,7 @@ describe("DocumentService", () => {
       .spyOn(prismaService.qRCode, "findMany")
       .mockResolvedValue(noActiveQRCodes);
 
-    await expect(service.viewDocument(privateId)).rejects.toThrow(
+    await expect(docService.viewDocument(privateId)).rejects.toThrow(
       NotFoundException,
     );
   });
@@ -287,7 +290,7 @@ describe("DocumentService", () => {
       .spyOn(prismaService.qRCode, "findMany")
       .mockResolvedValue(multipleActiveQRCodes);
 
-    await expect(service.viewDocument(privateId)).rejects.toThrow(
+    await expect(docService.viewDocument(privateId)).rejects.toThrow(
       "Multiple active QR codes found for this document",
     );
   });
@@ -301,15 +304,71 @@ describe("DocumentService", () => {
       }),
     );
 
-    await expect(service.viewDocument(privateId)).rejects.toThrow(
+    await expect(docService.viewDocument(privateId)).rejects.toThrow(
       PrismaClientKnownRequestError,
     );
   });
 
   it("should throw NotFoundException if QR code is not found", async () => {
     jest.spyOn(prismaService.qRCode, "findUnique").mockResolvedValue(null);
-    await expect(service.viewDocument(privateId)).rejects.toThrow(
+    await expect(docService.viewDocument(privateId)).rejects.toThrow(
       new NotFoundException("QR code not found"),
     );
+  });
+
+  it("should throw BadRequestException for invalid email format", async () => {
+    await expect(
+      docService.transferDocument("doc-id", "invalid-email")
+    ).rejects.toThrow(new BadRequestException("Invalid email format."));
+  });
+
+  it("should throw BadRequestException if document is not found", async () => {
+    jest.spyOn(prismaService.document, "findUnique").mockResolvedValue(null);
+
+    await expect(
+      docService.transferDocument("doc-id", "test@example.com")
+    ).rejects.toThrow(new BadRequestException("Document not found."));
+  });
+
+  it("should generate OTP, store it, and return the OTP", async () => {
+    const mockDocument = {
+      documentID: "doc-id",
+      documentName: "Test Document",
+      filePath: "https://example.com/doc.pdf",
+      uploadDate: new Date(),
+      publisher: "John Doe",
+      ownerCount: 1,
+      pendingOwner: null,
+      otp: null,
+      otpExpiry: null,
+      otpAttemptCount: 0,
+    };
+    jest
+      .spyOn(prismaService.document, "findUnique")
+      .mockResolvedValue(mockDocument);
+    jest.spyOn(prismaService.document, "update").mockResolvedValue({
+      ...mockDocument,
+      pendingOwner: "test@example.com",
+      otp: "000000",
+      otpExpiry: new Date(Date.now() + 8 * 60 * 1000),
+      otpAttemptCount: 0,
+    });
+
+    const result = await docService.transferDocument(
+      "doc-id",
+      "test@example.com"
+    );
+
+    expect(result).toHaveProperty("otp");
+    expect(result.otp).toMatch(/^\d{6}$/);
+    expect(prismaService.document.update).toHaveBeenCalledWith({
+      where: { documentID: "doc-id" },
+      data: {
+        pendingOwner: "test@example.com",
+        otp: expect.any(String),
+        otpExpiry: expect.any(Date),
+        otpAttemptCount: 0,
+      },
+    });
   });
 });

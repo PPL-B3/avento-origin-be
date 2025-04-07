@@ -64,12 +64,16 @@ describe("QrcodeService", () => {
 
   it("should return private and public QR code IDs", async () => {
     const mockDocument = {
-      documentID: "123",
-      documentName: "file",
-      filePath: "file.txt",
-      uploadDate: new Date(Date.now()),
-      publisher: "publisher",
+      documentID: "doc-id",
+      documentName: "Test Document",
+      filePath: "https://example.com/doc.pdf",
+      uploadDate: new Date(),
+      publisher: "John Doe",
       ownerCount: 1,
+      pendingOwner: null,
+      otp: null,
+      otpExpiry: null,
+      otpAttemptCount: 0,
       qrCode: [],
     };
 
