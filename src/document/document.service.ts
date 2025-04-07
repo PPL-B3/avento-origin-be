@@ -62,7 +62,7 @@ export class DocumentService {
         filePath: url,
         uploadDate: new Date(timestamp),
         publisher: body.ownerName,
-        ownerCount: 1,
+        ownerCount: 0,
       },
     });
   }
@@ -153,6 +153,7 @@ export class DocumentService {
     // Build the response object.
     const { document } = qrCode;
     const response: any = {
+      documentId: document.documentID,
       documentName: document.documentName,
       uploadDate: document.uploadDate,
       publisher: document.publisher,
