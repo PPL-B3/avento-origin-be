@@ -75,10 +75,50 @@ describe("DocumentRepository", () => {
       // Only one QR code is properly created; second returns an object missing "isPrivate".
       fakeTransaction.qrCode.create
         .mockResolvedValueOnce({ id: "only-qr", isPrivate: true })
-        .mockResolvedValueOnce({ id: "dummy-qr" });
+        .mockResolvedValueOnce({ id: "dummy-qr", isPrivate: true });
       await expect(repo.createDocument(createInput)).rejects.toThrowError(
         "Failed creating private and/or public QR codes."
       );
+    });
+
+    it("findDocumentById should use the default prisma instance when transaction is not provided", async () => {
+      // Arrange: set up a fake document and mock prisma.document.findUnique on the default prisma.
+      const documentId = "doc-123";
+      const fakeDoc = { documentID: documentId, qrCode: [] };
+      prisma.document.findUnique = jest.fn().mockResolvedValue(fakeDoc);
+
+      // Act: call findDocumentById without passing a transaction.
+      const result = await repo.findDocumentById(documentId);
+
+      // Assert: expect prisma.document.findUnique to have been called with the proper parameters.
+      expect(prisma.document.findUnique).toHaveBeenCalledWith({
+        where: { documentID: documentId },
+        include: { qrCode: true },
+      });
+      expect(result).toEqual(fakeDoc);
+    });
+
+    it("updateDocument should use the default prisma instance when transaction is not provided", async () => {
+      // Arrange: create update data and set up a fake updated document.
+      const documentId = "doc-123";
+      const updateData: Prisma.DocumentUpdateInput = {
+        documentName: "Updated Name",
+      };
+      const updatedDoc = {
+        documentID: documentId,
+        documentName: "Updated Name",
+      };
+      prisma.document.update = jest.fn().mockResolvedValue(updatedDoc);
+
+      // Act: call updateDocument without passing a transaction.
+      const result = await repo.updateDocument(documentId, updateData);
+
+      // Assert: expect prisma.document.update to have been called with the proper parameters.
+      expect(prisma.document.update).toHaveBeenCalledWith({
+        where: { documentID: documentId },
+        data: updateData,
+      });
+      expect(result).toEqual(updatedDoc);
     });
   });
 
@@ -118,7 +158,7 @@ describe("DocumentRepository", () => {
       });
       expect(fakeTransaction.qrCode.update).toHaveBeenCalledTimes(2);
       expect(fakeTransaction.document.update).toHaveBeenCalledWith({
-        where: { documentId },
+        where: { documentID: documentId },
         data: {
           qrCode: { connect: [{ id: "new-private" }, { id: "new-public" }] },
         },
@@ -142,10 +182,10 @@ describe("DocumentRepository", () => {
       // Simulate failure: second QR code creation returns an object missing isPrivate.
       fakeTransaction.qrCode.create
         .mockResolvedValueOnce({ id: "new-private", isPrivate: true })
-        .mockResolvedValueOnce({ id: "dummy-qr" });
+        .mockResolvedValueOnce({ id: "dummy-qr", isPrivate: true });
       await expect(
-        repo.changeOwnership(fakeTransaction, newOwner, documentId)
-      ).rejects.toThrowError("Failed creating private and/or public QR codes.");
+        repo.changeOwnership(fakeTransaction, newOwner, documentId),
+      ).rejects.toThrow("Failed creating private and/or public QR codes.");
     });
   });
 
@@ -187,7 +227,7 @@ describe("DocumentRepository", () => {
         fakeTransaction
       );
       expect(fakeTransaction.document.update).toHaveBeenCalledWith({
-        where: { documentId },
+        where: { documentID: documentId },
         data: updateData,
       });
       expect(result).toEqual(updatedDoc);

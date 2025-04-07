@@ -2,17 +2,19 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { DocumentController } from "./document.controller";
 import { DocumentService } from "../services/document.service";
 import * as request from "supertest";
-import { INestApplication } from "@nestjs/common";
+import { INestApplication, NotFoundException } from "@nestjs/common";
 import { MulterModule } from "@nestjs/platform-express";
 
 describe("DocumentController", () => {
   let app: INestApplication;
   let docService: DocumentService;
+  let controller: DocumentController;
 
   const mockDocService = {
     uploadDocument: jest.fn(),
     transferDocument: jest.fn(),
     claimDocument: jest.fn(),
+    viewDocument: jest.fn(),
   };
 
   beforeAll(async () => {
@@ -25,6 +27,7 @@ describe("DocumentController", () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
+    controller = moduleRef.get<DocumentController>(DocumentController);
     docService = moduleRef.get<DocumentService>(DocumentService);
   });
 
@@ -123,5 +126,33 @@ describe("DocumentController", () => {
 
     //   expect(res.status).toBe(400);
     // });
+  });
+
+  describe("/documents/view/:qrId (GET)", () => {
+    it("should return result from service (positive case)", async () => {
+      const qrId = "valid-uuid";
+      const expectedResult = {
+        documentName: "Test Document",
+        uploadDate: new Date(),
+        publisher: "Test Publisher",
+        ownershipHistory: [{ owner: "Owner1", generatedDate: new Date() }],
+        currentOwner: "Owner1",
+        filePath: "/test/path.pdf",
+      };
+      jest.spyOn(docService, "viewDocument").mockResolvedValue(expectedResult);
+
+      const result = await controller.viewDocument(qrId);
+      expect(result).toEqual(expectedResult);
+    });
+
+    it("should throw NotFoundException when the service throws one", async () => {
+      const qrId = "valid-uuid";
+      jest
+        .spyOn(docService, "viewDocument")
+        .mockRejectedValue(new NotFoundException("QR code not found"));
+      await expect(controller.viewDocument(qrId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 });

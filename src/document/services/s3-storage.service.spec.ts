@@ -62,7 +62,7 @@ describe("S3StorageService", () => {
 
     it("should propagate error if upload fails", async () => {
       // Override AWS.S3 to simulate a failure.
-      jest.spyOn(AWS.S3.prototype, "upload").mockImplementationOnce(
+      jest.spyOn(service["s3"], "upload").mockImplementationOnce(
         () =>
           ({
             promise: () => Promise.reject(new Error("Upload failed")),
@@ -74,8 +74,8 @@ describe("S3StorageService", () => {
           Buffer.from("pdf"),
           "application/pdf",
           "bucket",
-          "filename.pdf"
-        )
+          "filename.pdf",
+        ),
       ).rejects.toThrow("Upload failed");
     });
 
@@ -86,8 +86,17 @@ describe("S3StorageService", () => {
       const filename = "test-file.pdf";
 
       // Spy on the upload method to capture its parameters.
-      const uploadSpy = jest.fn().mockReturnValue({
-        promise: () => Promise.resolve({ Location: "url" }),
+      const uploadSpy = jest.spyOn(service["s3"], "upload").mockReturnValue({
+        promise: () =>
+          Promise.resolve({
+            Location: "url",
+            ETag: "asd",
+            Bucket: bucketName,
+            Key: filename,
+          }),
+        abort: jest.fn(),
+        send: jest.fn(),
+        on: jest.fn(),
       });
       jest.spyOn(AWS, "S3").mockImplementationOnce(
         () =>

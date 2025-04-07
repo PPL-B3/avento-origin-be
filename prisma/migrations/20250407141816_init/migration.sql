@@ -25,6 +25,7 @@ CREATE TABLE "Document" (
     "filePath" TEXT NOT NULL,
     "uploadDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publisher" TEXT NOT NULL,
+    "ownerCount" INTEGER NOT NULL,
     "pendingOwner" TEXT,
     "otp" TEXT,
     "otpExpiry" TIMESTAMP(3),
@@ -40,6 +41,7 @@ CREATE TABLE "qrcodes" (
     "isPrivate" BOOLEAN NOT NULL,
     "isActive" BOOLEAN NOT NULL,
     "generatedDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "ownerNumber" INTEGER NOT NULL,
     "documentId" TEXT NOT NULL,
 
     CONSTRAINT "qrcodes_pkey" PRIMARY KEY ("id")

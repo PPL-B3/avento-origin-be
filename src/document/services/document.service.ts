@@ -1,7 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 import { DocumentRepository } from "../repositories/document.repository";
 import { EmailService } from "./email.service";
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
 import { S3StorageService } from "./s3-storage.service";
 import { UploadDocumentDTO } from "../dto/upload-document.dto";
 import { randomInt } from "crypto";
@@ -14,7 +14,7 @@ export class DocumentService {
     private readonly documentRepo: DocumentRepository,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {}
 
   async uploadDocument(pdf: Express.Multer.File, dto: UploadDocumentDTO) {
@@ -25,7 +25,7 @@ export class DocumentService {
       pdf.buffer,
       pdf.mimetype,
       bucketName,
-      filename
+      filename,
     );
 
     return this.documentRepo.createDocument({
@@ -52,7 +52,7 @@ export class DocumentService {
       document.documentName,
       this.getCurrentOwner(document),
       document.publisher,
-      documentId
+      documentId,
     );
 
     return { otp: otp };
@@ -73,8 +73,8 @@ export class DocumentService {
 
       const qrCodeIds = await this.documentRepo.changeOwnership(
         transaction,
-        document.pendingOwner!,
-        documentId
+        document.pendingOwner,
+        documentId,
       );
 
       const updateData = {
@@ -87,7 +87,7 @@ export class DocumentService {
       await this.documentRepo.updateDocument(
         documentId,
         updateData,
-        transaction
+        transaction,
       );
 
       return qrCodeIds;
@@ -117,5 +117,77 @@ export class DocumentService {
       otpAttemptCount: { increment: 1 },
     });
     throw new BadRequestException("Incorrect OTP.");
+  }
+
+  async viewDocument(qrId: string) {
+    const qrCode = await this.prisma.qrCode.findUnique({
+      where: { id: qrId },
+      include: {
+        document: {
+          include: {
+            qrCode: {
+              orderBy: {
+                generatedDate: "asc",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!qrCode) {
+      throw new NotFoundException("QR code not found");
+    }
+
+    const document = qrCode.document;
+    const allQrCodes = document.qrCode;
+    const activeQRCodes = allQrCodes.filter((code) => code.isActive);
+
+    if (activeQRCodes.length === 0) {
+      throw new NotFoundException("No active QR code found for this document");
+    }
+    if (activeQRCodes.length > 2) {
+      throw new Error("Multiple active QR codes found for this document");
+    }
+
+    // Assume both active QR codes have the same owner.
+    const currentOwner = activeQRCodes[0].owner;
+
+    // Build ownership history from all QR codes.
+    const ownershipMap = new Map<
+      string,
+      { owner: string; generatedDate: Date }
+    >();
+
+    for (const code of allQrCodes) {
+      const key = code.generatedDate.toISOString();
+      if (!ownershipMap.has(key)) {
+        ownershipMap.set(key, {
+          owner: code.owner,
+          generatedDate: code.generatedDate,
+        });
+      }
+    }
+
+    // Convert the map to an array sorted by generatedDate ascending.
+    const ownershipHistory = Array.from(ownershipMap.values()).sort(
+      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime()
+    );
+
+    const response: any = {
+      documentId: document.documentID,
+      documentName: document.documentName,
+      uploadDate: document.uploadDate,
+      publisher: document.publisher,
+      currentOwner,
+      ownershipHistory,
+    };
+
+    // Include filePath only if the requested QR code is private.
+    if (qrCode.isPrivate) {
+      response.filePath = document.filePath;
+    }
+
+    return response;
   }
 }

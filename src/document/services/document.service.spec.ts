@@ -4,7 +4,7 @@ import { DocumentRepository } from "../repositories/document.repository";
 import { EmailService } from "./email.service";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../../prisma/prisma.service";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 
 describe("DocumentService", () => {
   let service: DocumentService;
@@ -27,6 +27,9 @@ describe("DocumentService", () => {
     // For simplicity, let $transaction just call the passed callback with a dummy transaction (here, using prisma as the transaction client)
     prisma = {
       $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
+      qrCode: {
+        findUnique: jest.fn(),
+      },
     } as any;
 
     service = new DocumentService(s3Storage, repo, email, config, prisma);
@@ -55,7 +58,10 @@ describe("DocumentService", () => {
         expect.stringMatching(/^Alice_My-Doc_\d+\.pdf$/)
       );
       expect(repo.createDocument).toHaveBeenCalled();
-      expect(result).toEqual({ id: "doc-id" });
+      expect(result).toEqual({
+        privateId: "new-qr-private",
+        publicId: "new-qr-public",
+      });
     });
 
     it("throws if bucket is not configured", async () => {
@@ -166,7 +172,7 @@ describe("DocumentService", () => {
       repo.updateDocument.mockResolvedValue({} as any);
 
       const result = await service.claimDocument("doc-id", "123456");
-      expect(repo.findDocumentById).toHaveBeenCalledWith("doc-id", prisma);
+      expect(repo.findDocumentById).toHaveBeenCalledWith("doc-id");
       expect(repo.changeOwnership).toHaveBeenCalled();
       expect(repo.updateDocument).toHaveBeenCalledWith(
         "doc-id",
@@ -242,6 +248,259 @@ describe("DocumentService", () => {
       const dto = { ownerName: "John Doe", documentName: "My Doc" };
       const result = (service as any).generateFilename(dto, 123456);
       expect(result).toBe("John-Doe_My-Doc_123456.pdf");
+    });
+  });
+
+  describe("view document", () => {
+    it("should throw NotFoundException if QR code is not found", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(service.viewDocument("non-existent-id")).rejects.toThrow(
+        new NotFoundException("QR code not found"),
+      );
+    });
+
+    it("should throw NotFoundException if no active QR codes are found", async () => {
+      const fakeDocument = {
+        documentID: "doc123",
+        documentName: "Test Doc",
+        uploadDate: new Date("2025-04-05T12:00:00Z"),
+        publisher: "Test Publisher",
+        filePath: "/path/to/file",
+        // All QR codes are inactive.
+        qrCode: [
+          {
+            id: "qr1",
+            owner: "Alice",
+            isActive: false,
+            isPrivate: true,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr2",
+            owner: "Alice",
+            isActive: false,
+            isPrivate: false,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+        ],
+      };
+
+      const fakeQrCode = {
+        id: "qr1",
+        owner: "Alice",
+        isActive: false,
+        isPrivate: true,
+        generatedDate: new Date("2025-04-05T10:00:00Z"),
+        documentId: "doc123",
+        document: fakeDocument,
+      };
+
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      await expect(service.viewDocument("qr1")).rejects.toThrow(
+        new NotFoundException("No active QR code found for this document"),
+      );
+    });
+
+    it("should throw error if more than 2 active QR codes are found", async () => {
+      const fakeDocument = {
+        documentID: "doc123",
+        documentName: "Test Doc",
+        uploadDate: new Date("2025-04-05T12:00:00Z"),
+        publisher: "Test Publisher",
+        filePath: "/path/to/file",
+        // Simulate three active QR codes.
+        qrCode: [
+          {
+            id: "qr1",
+            owner: "Bob",
+            isActive: true,
+            isPrivate: true,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr2",
+            owner: "Bob",
+            isActive: true,
+            isPrivate: false,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr3",
+            owner: "Bob",
+            isActive: true,
+            isPrivate: true,
+            generatedDate: new Date("2025-04-05T11:00:00Z"),
+            documentId: "doc123",
+          },
+        ],
+      };
+
+      const fakeQrCode = {
+        id: "qr1",
+        owner: "Bob",
+        isActive: true,
+        isPrivate: true,
+        generatedDate: new Date("2025-04-05T10:00:00Z"),
+        documentId: "doc123",
+        document: fakeDocument,
+      };
+
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      await expect(service.viewDocument("qr1")).rejects.toThrow(
+        "Multiple active QR codes found for this document",
+      );
+    });
+
+    it("should return document details, ownershipHistory, currentOwner and filePath when qrCode is private", async () => {
+      const fakeDocument = {
+        documentID: "doc123",
+        documentName: "Test Doc",
+        uploadDate: new Date("2025-04-05T12:00:00Z"),
+        publisher: "Test Publisher",
+        filePath: "/path/to/file",
+        // Two ownership events: one for an older pair and one for the active pair.
+        qrCode: [
+          // Older (inactive) pair.
+          {
+            id: "qr1",
+            owner: "Alice",
+            isActive: false,
+            isPrivate: true,
+            generatedDate: new Date("2025-04-05T08:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr2",
+            owner: "Alice",
+            isActive: false,
+            isPrivate: false,
+            generatedDate: new Date("2025-04-05T08:00:00Z"),
+            documentId: "doc123",
+          },
+          // Active pair with identical generatedDate.
+          {
+            id: "qr3",
+            owner: "Bob",
+            isActive: true,
+            isPrivate: true,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr4",
+            owner: "Bob",
+            isActive: true,
+            isPrivate: false,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+        ],
+      };
+
+      // Query using one of the active private QR codes.
+      const fakeQrCode = {
+        id: "qr3",
+        owner: "Bob",
+        isActive: true,
+        isPrivate: true,
+        generatedDate: new Date("2025-04-05T10:00:00Z"),
+        documentId: "doc123",
+        document: fakeDocument,
+      };
+
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      const result = await service.viewDocument("qr3");
+
+      // Document details.
+      expect(result.documentId).toEqual("doc123");
+      expect(result.documentName).toEqual("Test Doc");
+      expect(result.uploadDate).toEqual(new Date("2025-04-05T12:00:00Z"));
+      expect(result.publisher).toEqual("Test Publisher");
+      // filePath is included because the queried QR code is private.
+      expect(result.filePath).toEqual("/path/to/file");
+      // currentOwner should be "Bob" (from active QR codes).
+      expect(result.currentOwner).toEqual("Bob");
+      // Ownership history deduplicates by generatedDate: two unique events expected.
+      expect(result.ownershipHistory).toHaveLength(2);
+      expect(result.ownershipHistory[0]).toEqual({
+        owner: "Alice",
+        generatedDate: new Date("2025-04-05T08:00:00Z"),
+      });
+      expect(result.ownershipHistory[1]).toEqual({
+        owner: "Bob",
+        generatedDate: new Date("2025-04-05T10:00:00Z"),
+      });
+    });
+
+    it("should return document details, ownershipHistory, currentOwner and no filePath when qrCode is public", async () => {
+      const fakeDocument = {
+        documentID: "doc123",
+        documentName: "Test Doc",
+        uploadDate: new Date("2025-04-05T12:00:00Z"),
+        publisher: "Test Publisher",
+        filePath: "/path/to/file",
+        qrCode: [
+          {
+            id: "qr1",
+            owner: "Alice",
+            isActive: false,
+            isPrivate: true,
+            generatedDate: new Date("2025-04-05T08:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr2",
+            owner: "Alice",
+            isActive: false,
+            isPrivate: false,
+            generatedDate: new Date("2025-04-05T08:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr3",
+            owner: "Bob",
+            isActive: true,
+            isPrivate: false,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+          {
+            id: "qr4",
+            owner: "Bob",
+            isActive: true,
+            isPrivate: true,
+            generatedDate: new Date("2025-04-05T10:00:00Z"),
+            documentId: "doc123",
+          },
+        ],
+      };
+
+      // Query using a public QR code from the active pair.
+      const fakeQrCode = {
+        id: "qr3",
+        owner: "Bob",
+        isActive: true,
+        isPrivate: false,
+        generatedDate: new Date("2025-04-05T10:00:00Z"),
+        documentId: "doc123",
+        document: fakeDocument,
+      };
+
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      const result = await service.viewDocument("qr3");
+
+      expect(result.documentId).toEqual("doc123");
+      expect(result.documentName).toEqual("Test Doc");
+      expect(result.uploadDate).toEqual(new Date("2025-04-05T12:00:00Z"));
+      expect(result.publisher).toEqual("Test Publisher");
+      // When the requested QR code is public, filePath should not be included.
+      expect(result.filePath).toBeUndefined();
+      expect(result.currentOwner).toEqual("Bob");
+      expect(result.ownershipHistory).toHaveLength(2);
     });
   });
 });

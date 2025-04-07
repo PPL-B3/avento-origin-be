@@ -11,7 +11,6 @@ import { PrismaService } from "./prisma/prisma.service";
 import { AuthModule } from "./auth/auth.module";
 // import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 import { ConfigModule } from "@nestjs/config";
-import { QrcodeModule } from "./qrcode/qrcode.module";
 
 @Module({
   imports: [
@@ -22,7 +21,6 @@ import { QrcodeModule } from "./qrcode/qrcode.module";
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    QrcodeModule,
   ],
   providers: [PrismaService],
 })

@@ -29,11 +29,11 @@ export class JwtAuthMiddleware implements NestMiddleware {
       // Check if the token is blacklisted before proceeding further
       const isBlacklisted = await this.jwtService.isTokenBlacklisted(
         token,
-        userId
+        userId,
       );
       if (isBlacklisted) {
         throw new UnauthorizedException(
-          "Token sudah tidak berlaku (sudah logout)"
+          "Token sudah tidak berlaku (sudah logout)",
         );
       }
 

@@ -10,11 +10,14 @@ services:
       - POSTGRES_PORT=5432
       - DATABASE_URL=postgresql://postgres:postgres@database:5432/avento_origin?schema=public
       - JWT_SECRET=dev_jwt_secret
+      - API_ENDPOINT=/api
       - DO_SPACES_BUCKET
       - DO_SPACES_REGION
       - DO_SPACES_ENDPOINT
       - DO_SPACES_KEY
       - DO_SPACES_SECRET
+      - GMAIL_USER
+      - GMAIL_PASS
     ports:
       - "4000:4000"
 
