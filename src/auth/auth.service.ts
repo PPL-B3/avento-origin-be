@@ -8,12 +8,14 @@ import { AuthDto } from "./dto";
 import * as argon from "argon2";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "./jwt/jwt.service";
+import { AuditLogService } from "../auditLog/auditLog.service";
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
+    private auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -25,10 +27,29 @@ export class AuthService {
     }
 
     try {
+      const user = await this.prismaService.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      if (!user) {
+        throw new BadRequestException("Gagal Logout");
+      }
+
       await this.prismaService.user.update({
         where: { id: userId },
         data: { lastLogout: BigInt(Date.now()) },
       });
+
+      try {
+        await this.auditLogService.addAuditLog({
+          eventType: "LOGOUT",
+          userID: userId,
+          details: `User with email ${user.email} logged out.`,
+        });
+      } catch (err) {
+        console.error("Audit log failed:", err); // Log saja, jangan ganggu logout
+      }
 
       return {
         success: true,
@@ -87,6 +108,12 @@ export class AuthService {
     }
 
     const token = this.jwtService.generateToken({ userId: user.id });
+
+    await this.auditLogService.addAuditLog({
+      eventType: "LOGIN",
+      userID: user.id,
+      details: `User with email ${user.email} logged in.`,
+    });
 
     return {
       access_token: token,

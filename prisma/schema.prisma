@@ -29,6 +29,8 @@ model User {
   role       String
   lastLogout BigInt
 
+  auditLogs AuditLog[]
+
   @@map("users")
 }
 
@@ -39,6 +41,7 @@ model Document {
   uploadDate   DateTime @default(now())
   publisher    String
   qrCode       QrCode[]
+  AuditLog     AuditLog[]
 
   pendingOwner    String?
   otp             String?
@@ -57,4 +60,17 @@ model QrCode {
     documentId String
 
     @@map("qrcodes")
+}
+
+model AuditLog {
+  logID      String    @id @default(uuid())
+  eventType  String
+  timestamp  DateTime  @default(now())
+  user       User      @relation(fields: [userID], references: [id])
+  userID     String
+  document   Document? @relation(fields: [documentID], references: [documentID])
+  documentID String?
+  details    String
+
+  @@map("audit_logs")
 }
