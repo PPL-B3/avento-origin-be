@@ -14,7 +14,7 @@ export class QrcodeService {
       throw new BadRequestException("Document not found.");
     }
 
-    const privateQr = await this.prismaService.qRCode.create({
+    const privateQr = await this.prismaService.qrCode.create({
       data: {
         documentId,
         owner: ownerName,
@@ -25,7 +25,7 @@ export class QrcodeService {
         id: true,
       },
     });
-    const publicQr = await this.prismaService.qRCode.create({
+    const publicQr = await this.prismaService.qrCode.create({
       data: {
         documentId,
         owner: ownerName,

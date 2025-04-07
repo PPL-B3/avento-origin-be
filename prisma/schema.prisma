@@ -38,15 +38,15 @@ model Document {
   filePath     String
   uploadDate   DateTime @default(now())
   publisher    String
-  qrCode       QRCode[]
+  qrCode       QrCode[]
 
-  pendingOwner     String?
+  pendingOwner    String?
   otp             String?
   otpExpiry       DateTime?
   otpAttemptCount Int @default(0)
 }
 
-model QRCode {
+model QrCode {
     id String @id @default(uuid())
     owner String
     isPrivate Boolean

@@ -4,7 +4,7 @@ import {
   // NestModule,
   // RequestMethod,
 } from "@nestjs/common";
-import { DocumentModule } from "./document/document.module";
+import { DocumentsModule } from "./document/document.module";
 import { HelloModule } from "./hello/hello.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
@@ -18,7 +18,7 @@ import { QrcodeModule } from "./qrcode/qrcode.module";
     HelloModule,
     PrismaModule,
     AuthModule,
-    DocumentModule,
+    DocumentsModule,
     ConfigModule.forRoot({
       isGlobal: true,
     }),

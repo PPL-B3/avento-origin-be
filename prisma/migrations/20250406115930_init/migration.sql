@@ -25,6 +25,10 @@ CREATE TABLE "Document" (
     "filePath" TEXT NOT NULL,
     "uploadDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publisher" TEXT NOT NULL,
+    "pendingOwner" TEXT,
+    "otp" TEXT,
+    "otpExpiry" TIMESTAMP(3),
+    "otpAttemptCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "Document_pkey" PRIMARY KEY ("documentID")
 );
