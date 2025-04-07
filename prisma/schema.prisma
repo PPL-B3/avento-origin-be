@@ -37,5 +37,24 @@ model Document {
   documentName String
   filePath     String
   uploadDate   DateTime @default(now())
-  ownerName    String
+  publisher    String
+  qrCode       QrCode[]
+
+  pendingOwner    String?
+  otp             String?
+  otpExpiry       DateTime?
+  otpAttemptCount Int @default(0)
+}
+
+model QrCode {
+    id String @id @default(uuid())
+    owner String
+    isPrivate Boolean
+    isActive Boolean
+    generatedDate DateTime @default(now())
+
+    document Document @relation(fields: [documentId], references: [documentID])
+    documentId String
+
+    @@map("qrcodes")
 }
