@@ -3,34 +3,25 @@ import {
   Body,
   Controller,
   Get,
-  InternalServerErrorException,
   Param,
   ParseUUIDPipe,
   Post,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
-import { DocumentService } from "./document.service";
+import { ClaimDocumentDTO } from "../dto/claim-document.dto";
+import { DocumentService } from "../services/document.service";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { UploadDocumentDTO } from "./dto/upload-document.dto";
-import { QrcodeService } from "../qrcode/qrcode.service";
-import {
-  ApiBody,
-  ApiConsumes,
-  ApiOperation,
-  ApiResponse,
-} from "@nestjs/swagger";
-import { PrismaService } from "../prisma/prisma.service";
+import { TransferDocumentDTO } from "../dto/transfer-document.dto";
+import { UploadDocumentDTO } from "../dto/upload-document.dto";
+import { ApiBody, ApiConsumes, ApiOperation, ApiResponse } from "@nestjs/swagger";
 
 @Controller("documents")
 export class DocumentController {
   private readonly MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB.
+  private readonly FILE_TYPE = "application/pdf"; // PDF.
 
-  constructor(
-    private readonly docService: DocumentService,
-    private readonly qrService: QrcodeService,
-    private readonly prismaService: PrismaService,
-  ) {}
+  constructor(private readonly docService: DocumentService) {}
 
   @Post("upload")
   @UseInterceptors(FileInterceptor("file"))
@@ -75,35 +66,33 @@ export class DocumentController {
   })
   @ApiResponse({ status: 500, description: "Internal Server Error" })
   async uploadDocument(
-    @UploadedFile() file: Express.Multer.File | null,
+    @UploadedFile() file: Express.Multer.File,
     @Body() body: UploadDocumentDTO,
   ) {
-    if (!file) throw new BadRequestException("No file uploaded.");
-    if (file.mimetype !== "application/pdf") {
+    if (!file) {
+      throw new BadRequestException("No file uploaded.");
+    }
+    if (file.mimetype !== this.FILE_TYPE) {
       throw new BadRequestException("Invalid file type.");
     }
     if (file.size > this.MAX_FILE_SIZE) {
       throw new BadRequestException("File size exceeds 8MB limit.");
     }
-    if (!body.documentName || !body.ownerName) {
-      throw new BadRequestException("Missing required fields.");
-    }
 
-    try {
-      const doc = await this.docService.uploadDocument(file, body);
-      return await this.qrService.generateQr(doc.documentID, body.ownerName);
-    } catch (error) {
-      throw new InternalServerErrorException(error.message);
-    }
+    return await this.docService.uploadDocument(file, body);
   }
 
   @Post("transfer")
-  async transferDocument(@Body() body: { documentId: string; email: string }) {
-    if (!body.documentId || !body.email) {
-      throw new BadRequestException("Missing documentId or email.");
-    }
+  async transferDocument(@Body() body: TransferDocumentDTO) {
+    return await this.docService.transferDocument(
+      body.documentId,
+      body.pendingOwner,
+    );
+  }
 
-    return await this.docService.transferDocument(body.documentId, body.email);
+  @Post("claim")
+  async claimDocument(@Body() body: ClaimDocumentDTO) {
+    return await this.docService.claimDocument(body.documentId, body.otp);
   }
 
   @Get("view/:qrId")
