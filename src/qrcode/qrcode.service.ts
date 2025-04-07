@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 @Injectable()
 export class QrcodeService {
@@ -47,7 +47,6 @@ export class QrcodeService {
         id: true,
       },
     });
-
     const publicQr = await this.prismaService.qRCode.create({
       data: {
         documentId,

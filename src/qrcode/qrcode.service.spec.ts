@@ -57,22 +57,6 @@ describe("QrcodeService", () => {
     jest.clearAllMocks();
   });
 
-  it("should throw a bad request error if documentId is not found", async () => {
-    const docId = "123";
-    const owner = "owner";
-
-    jest.spyOn(prismaService.document, "findUniqueOrThrow").mockRejectedValue(
-      new PrismaClientKnownRequestError("", {
-        code: "P2025",
-        clientVersion: "6.5.0",
-      }),
-    );
-
-    await expect(qrService.generateQr(docId, owner)).rejects.toThrow(
-      new BadRequestException("No document found with such ID"),
-    );
-  });
-
   it("should propegate error if exception code is other", async () => {
     const docId = "123";
     const owner = "owner";
@@ -87,6 +71,22 @@ describe("QrcodeService", () => {
       .mockRejectedValue(err);
 
     await expect(qrService.generateQr(docId, owner)).rejects.toThrow(err);
+  });
+
+  it("should throw a bad request error if documentId is not found", async () => {
+    const docId = "123";
+    const owner = "owner";
+
+    jest.spyOn(prismaService.document, "findUniqueOrThrow").mockRejectedValue(
+      new PrismaClientKnownRequestError("", {
+        code: "P2025",
+        clientVersion: "6.5.0",
+      }),
+    );
+
+    await expect(qrService.generateQr(docId, owner)).rejects.toThrow(
+      new BadRequestException("No document found with such ID"),
+    );
   });
 
   it("should generate QR codes successfully when no active QR codes exist", async () => {
