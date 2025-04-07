@@ -38,6 +38,7 @@ model Document {
   filePath     String
   uploadDate   DateTime @default(now())
   publisher    String
+  ownerCount   Int
   qrCode       QRCode[]
 
   pendingOwner     String?
@@ -52,6 +53,7 @@ model QRCode {
     isPrivate Boolean
     isActive Boolean
     generatedDate DateTime @default(now())
+    ownerNumber Int
 
     document Document @relation(fields: [documentId], references: [documentID])
     documentId String

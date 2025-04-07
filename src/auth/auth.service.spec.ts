@@ -197,7 +197,7 @@ describe("AuthService", () => {
         id: "123",
         email: mockUser.email,
         role: mockUser.role,
-      }
+      },
     });
   });
 

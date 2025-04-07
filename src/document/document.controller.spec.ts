@@ -3,12 +3,15 @@ import * as path from "path";
 import {
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
+  ParseUUIDPipe,
 } from "@nestjs/common";
 import { DocumentController } from "./document.controller";
 import { DocumentService } from "./document.service";
 import { Test, TestingModule } from "@nestjs/testing";
 import { UploadDocumentDTO } from "./dto/upload-document.dto";
 import { QrcodeService } from "../qrcode/qrcode.service";
+import { PrismaModule } from "../prisma/prisma.module";
 
 describe("DocumentController", () => {
   let controller: DocumentController;
@@ -19,6 +22,7 @@ describe("DocumentController", () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [PrismaModule],
       controllers: [DocumentController],
       providers: [
         {
@@ -29,6 +33,7 @@ describe("DocumentController", () => {
               url: "https://mock-url.com/document.pdf",
             }),
             transferDocument: jest.fn(),
+            viewDocument: jest.fn(),
           },
         },
         {
@@ -144,7 +149,10 @@ describe("DocumentController", () => {
 
   it("should throw BadRequestException if documentId is missing", async () => {
     await expect(
-      controller.transferDocument({ documentId: "", email: "test@example.com" })
+      controller.transferDocument({
+        documentId: "",
+        email: "test@example.com",
+      }),
     ).rejects.toThrow(new BadRequestException("Missing documentId or email."));
   });
 
@@ -180,7 +188,33 @@ describe("DocumentController", () => {
       controller.transferDocument({
         documentId: "doc-id",
         email: "test@example.com",
-      })
+      }),
     ).rejects.toThrow(new BadRequestException("Invalid document."));
+  });
+
+  it("should return result from service (positive case)", async () => {
+    const qrId = "valid-uuid";
+    const expectedResult = {
+      documentName: "Test Document",
+      uploadDate: new Date(),
+      publisher: "Test Publisher",
+      ownershipHistory: [{ owner: "Owner1", generatedDate: new Date() }],
+      currentOwner: "Owner1",
+      filePath: "/test/path.pdf",
+    };
+    jest.spyOn(service, "viewDocument").mockResolvedValue(expectedResult);
+
+    const result = await controller.viewDocument(qrId);
+    expect(result).toEqual(expectedResult);
+  });
+
+  it("should throw NotFoundException when the service throws one", async () => {
+    const qrId = "valid-uuid";
+    jest
+      .spyOn(service, "viewDocument")
+      .mockRejectedValue(new NotFoundException("QR code not found"));
+    await expect(controller.viewDocument(qrId)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 });
