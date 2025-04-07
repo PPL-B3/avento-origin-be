@@ -8,6 +8,26 @@ describe("QrcodeService", () => {
   let qrService: QrcodeService;
   let prismaService: PrismaService;
 
+  const privateQrMock = { id: "private123" };
+  const publicQrMock = { id: "public123" };
+
+  const mockDocument = {
+    documentID: "doc123",
+    documentName: "Test Document",
+    filePath: "file.pdf",
+    uploadDate: new Date(),
+    publisher: "Test Publisher",
+    ownerCount: 2,
+    pendingOwner: null,
+    otp: null,
+    otpExpiry: null,
+    otpAttemptCount: 0,
+    qrCode: [],
+  };
+
+  const documentId = "doc123";
+  const ownerName = "OwnerName";
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -17,9 +37,12 @@ describe("QrcodeService", () => {
           useValue: {
             document: {
               findUniqueOrThrow: jest.fn(),
+              update: jest.fn(),
             },
             qRCode: {
               create: jest.fn(),
+              findMany: jest.fn(),
+              update: jest.fn(),
             },
           },
         },
@@ -28,6 +51,10 @@ describe("QrcodeService", () => {
 
     qrService = module.get<QrcodeService>(QrcodeService);
     prismaService = module.get<PrismaService>(PrismaService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it("should throw a bad request error if documentId is not found", async () => {
@@ -62,39 +89,129 @@ describe("QrcodeService", () => {
     await expect(qrService.generateQr(docId, owner)).rejects.toThrow(err);
   });
 
-  it("should return private and public QR code IDs", async () => {
-    const mockDocument = {
-      documentID: "doc-id",
-      documentName: "Test Document",
-      filePath: "https://example.com/doc.pdf",
-      uploadDate: new Date(),
-      publisher: "John Doe",
-      ownerCount: 1,
-      pendingOwner: null,
-      otp: null,
-      otpExpiry: null,
-      otpAttemptCount: 0,
-      qrCode: [],
-    };
-
-    const privateId = "private123";
-    const publicId = "public123";
-
-    jest
-      .spyOn(prismaService.document, "findUniqueOrThrow")
-      .mockResolvedValue(mockDocument);
-
-    const qrcode_create = jest.spyOn(prismaService.qRCode, "create");
-    qrcode_create.mockResolvedValueOnce({ id: privateId } as any);
-    qrcode_create.mockResolvedValueOnce({ id: publicId } as any);
-
-    const result = await qrService.generateQr(
-      mockDocument.documentID,
-      mockDocument.publisher,
+  it("should generate QR codes successfully when no active QR codes exist", async () => {
+    // Simulate that the document is found.
+    (prismaService.document.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+      mockDocument,
     );
+    // Simulate no active QR codes exist.
+    (prismaService.qRCode.findMany as jest.Mock).mockResolvedValue([]);
+    (prismaService.qRCode.create as jest.Mock)
+      .mockResolvedValueOnce(privateQrMock)
+      .mockResolvedValueOnce(publicQrMock);
+    (prismaService.document.update as jest.Mock).mockResolvedValue({});
+
+    const result = await qrService.generateQr(documentId, ownerName);
+
+    expect(prismaService.document.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { documentID: documentId },
+    });
+
+    expect(prismaService.qRCode.findMany).toHaveBeenCalledWith({
+      where: { documentId, isActive: true },
+    });
+
+    // Since no active QR codes exist, no deactivation should occur.
+    expect(prismaService.qRCode.update).not.toHaveBeenCalled();
+
+    const newOwnerNumber = mockDocument.ownerCount + 1;
+    expect(prismaService.qRCode.create).toHaveBeenNthCalledWith(1, {
+      data: {
+        documentId,
+        owner: ownerName,
+        isPrivate: true,
+        isActive: true,
+        ownerNumber: newOwnerNumber,
+      },
+      select: { id: true },
+    });
+    expect(prismaService.qRCode.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        documentId,
+        owner: ownerName,
+        isPrivate: false,
+        isActive: true,
+        ownerNumber: newOwnerNumber,
+      },
+      select: { id: true },
+    });
+    expect(prismaService.document.update).toHaveBeenCalledWith({
+      where: { documentID: documentId },
+      data: { ownerCount: { increment: 1 } },
+    });
+
     expect(result).toEqual({
-      privateId: privateId,
-      publicId: publicId,
+      privateId: privateQrMock.id,
+      publicId: publicQrMock.id,
+    });
+  });
+
+  it("should deactivate all active QR codes if they exist and then generate new QR codes", async () => {
+    (prismaService.document.findUniqueOrThrow as jest.Mock).mockResolvedValue(
+      mockDocument,
+    );
+    // Simulate that two active QR codes already exist.
+    const activeQRCodes = [
+      { id: "activePrivate", isActive: true },
+      { id: "activePublic", isActive: true },
+    ];
+    (prismaService.qRCode.findMany as jest.Mock).mockResolvedValue(
+      activeQRCodes,
+    );
+    // Simulate successful deactivation updates.
+    (prismaService.qRCode.update as jest.Mock).mockResolvedValue({});
+    (prismaService.qRCode.create as jest.Mock)
+      .mockResolvedValueOnce(privateQrMock)
+      .mockResolvedValueOnce(publicQrMock);
+    (prismaService.document.update as jest.Mock).mockResolvedValue({});
+
+    const result = await qrService.generateQr(documentId, ownerName);
+
+    expect(prismaService.document.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { documentID: documentId },
+    });
+
+    expect(prismaService.qRCode.findMany).toHaveBeenCalledWith({
+      where: { documentId, isActive: true },
+    });
+
+    // Expect each active QR code to be deactivated.
+    for (const activeQr of activeQRCodes) {
+      expect(prismaService.qRCode.update).toHaveBeenCalledWith({
+        where: { id: activeQr.id },
+        data: { isActive: false },
+      });
+    }
+
+    const newOwnerNumber = mockDocument.ownerCount + 1;
+    expect(prismaService.qRCode.create).toHaveBeenNthCalledWith(1, {
+      data: {
+        documentId,
+        owner: ownerName,
+        isPrivate: true,
+        isActive: true,
+        ownerNumber: newOwnerNumber,
+      },
+      select: { id: true },
+    });
+    expect(prismaService.qRCode.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        documentId,
+        owner: ownerName,
+        isPrivate: false,
+        isActive: true,
+        ownerNumber: newOwnerNumber,
+      },
+      select: { id: true },
+    });
+    expect(prismaService.document.update).toHaveBeenCalledWith({
+      where: { documentID: documentId },
+      data: { ownerCount: { increment: 1 } },
+    });
+
+    expect(result).toEqual({
+      privateId: privateQrMock.id,
+      publicId: publicQrMock.id,
     });
   });
 });

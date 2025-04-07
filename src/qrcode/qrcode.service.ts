@@ -7,8 +7,9 @@ export class QrcodeService {
   constructor(private readonly prismaService: PrismaService) {}
 
   async generateQr(documentId: string, ownerName: string) {
+    let document;
     try {
-      await this.prismaService.document.findUniqueOrThrow({
+      document = await this.prismaService.document.findUniqueOrThrow({
         where: { documentID: documentId },
       });
     } catch (err) {
@@ -20,13 +21,27 @@ export class QrcodeService {
       throw err;
     }
 
+    // Retrieve all active QR codes for this document.
+    const activeQRCodes = await this.prismaService.qRCode.findMany({
+      where: { documentId, isActive: true },
+    });
+    // If any active QR codes exist (should be 0 or 2), deactivate them.
+    if (activeQRCodes.length > 0) {
+      for (const activeQr of activeQRCodes) {
+        await this.prismaService.qRCode.update({
+          where: { id: activeQr.id },
+          data: { isActive: false },
+        });
+      }
+    }
+
     const privateQr = await this.prismaService.qRCode.create({
       data: {
         documentId,
         owner: ownerName,
         isPrivate: true,
         isActive: true,
-        ownerNumber: 1,
+        ownerNumber: document.ownerCount + 1,
       },
       select: {
         id: true,
@@ -39,10 +54,21 @@ export class QrcodeService {
         owner: ownerName,
         isPrivate: false,
         isActive: true,
-        ownerNumber: 1,
+        ownerNumber: document.ownerCount + 1,
       },
       select: {
         id: true,
+      },
+    });
+
+    await this.prismaService.document.update({
+      where: {
+        documentID: documentId,
+      },
+      data: {
+        ownerCount: {
+          increment: 1,
+        },
       },
     });
 
