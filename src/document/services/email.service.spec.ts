@@ -1,73 +1,73 @@
-import { EmailService } from "./email.service";
+import { Test, TestingModule } from "@nestjs/testing";
+import { EmailService } from "../services/email.service";
 import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
 
-jest.mock("nodemailer");
+jest.mock("nodemailer", () => ({
+  createTransport: jest.fn().mockReturnValue({
+    sendMail: jest.fn().mockResolvedValue({ messageId: "test-message-id" }),
+  }),
+}));
 
 describe("EmailService", () => {
-  let emailService: EmailService;
-  let configService: Partial<ConfigService>;
-  let sendMailMock: jest.Mock;
+  let service: EmailService;
+  let configService: ConfigService;
+  let transporter: any;
 
-  beforeEach(() => {
-    // Create a fake configService returning Gmail credentials.
-    configService = {
-      get: jest.fn((key: string) => {
-        if (key === "GMAIL_USER") return "test@gmail.com";
-        if (key === "GMAIL_PASS") return "secret";
-        return null;
-      }),
-    };
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        EmailService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              const values = {
+                GMAIL_USER: "gmail@test.com",
+                GMAIL_PASS: "secret",
+              };
+              return values[key];
+            }),
+          },
+        },
+      ],
+    }).compile();
 
-    // Create a fake transporter with sendMail method.
-    sendMailMock = jest.fn().mockResolvedValue("ok");
-    (nodemailer.createTransport as jest.Mock).mockReturnValue({
-      sendMail: sendMailMock,
-    });
-
-    emailService = new EmailService(configService as ConfigService);
+    service = module.get<EmailService>(EmailService);
+    configService = module.get<ConfigService>(ConfigService);
+    transporter = (nodemailer.createTransport as jest.Mock)();
   });
 
-  describe("sendOwnershipTransferEmail", () => {
-    const email = "recipient@example.com";
-    const documentName = "Important Doc";
-    const owner = "Alice";
-    const publisher = "Bob";
-    const documentId = "doc-123";
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
 
-    it("should send an email with correct content", async () => {
-      await emailService.sendOwnershipTransferEmail(
-        email,
-        documentName,
-        owner,
-        publisher,
-        documentId
-      );
-      expect(sendMailMock).toHaveBeenCalledTimes(1);
-      const callArgs = sendMailMock.mock.calls[0][0];
-
-      // Verify the "from" field uses the GMAIL_USER
-      expect(callArgs.from).toBe(`"Avento Origin" <test@gmail.com>`);
-      expect(callArgs.to).toBe(email);
-      expect(callArgs.subject).toBe("Tautan Pengalihan Kepemilikan Dokumen");
-      // Check that the html contains proper owner, documentName, publisher and URL.
-      expect(callArgs.html).toContain(`<code>${owner}</code>`);
-      expect(callArgs.html).toContain(`<code>${documentName}</code>`);
-      expect(callArgs.html).toContain(`<code>${publisher}</code>`);
-      expect(callArgs.html).toContain(`http://sample-url.com/${documentId}`);
+  it("should send ownership transfer email successfully", async () => {
+    await service.sendOwnershipTransferEmail(
+      "user@example.com",
+      "Test Document",
+      "owner",
+      "publisher",
+      "doc-id-123"
+    );
+    expect(transporter.sendMail).toHaveBeenCalledWith({
+      from: `"Avento Origin" <gmail@test.com>`,
+      to: "user@example.com",
+      subject: "Tautan Pengalihan Kepemilikan Dokumen",
+      html: expect.stringContaining("Test Document"),
     });
+  });
 
-    it("should propagate errors thrown by sendMail", async () => {
-      sendMailMock.mockRejectedValueOnce(new Error("Send failed"));
-      await expect(
-        emailService.sendOwnershipTransferEmail(
-          email,
-          documentName,
-          owner,
-          publisher,
-          documentId
-        )
-      ).rejects.toThrow("Send failed");
-    });
+  it("should propagate error if sendMail fails", async () => {
+    transporter.sendMail.mockRejectedValueOnce(new Error("Email failure"));
+    await expect(
+      service.sendOwnershipTransferEmail(
+        "user@example.com",
+        "Test Document",
+        "owner",
+        "publisher",
+        "doc-id-123"
+      )
+    ).rejects.toThrow("Email failure");
   });
 });

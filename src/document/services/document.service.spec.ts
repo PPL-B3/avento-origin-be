@@ -255,7 +255,7 @@ describe("DocumentService", () => {
     it("should throw NotFoundException if QR code is not found", async () => {
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
       await expect(service.viewDocument("non-existent-id")).rejects.toThrow(
-        new NotFoundException("QR code not found"),
+        new NotFoundException("QR code not found")
       );
     });
 
@@ -299,7 +299,7 @@ describe("DocumentService", () => {
 
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
       await expect(service.viewDocument("qr1")).rejects.toThrow(
-        new NotFoundException("No active QR code found for this document"),
+        new NotFoundException("No active QR code found for this document")
       );
     });
 
@@ -351,7 +351,7 @@ describe("DocumentService", () => {
 
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
       await expect(service.viewDocument("qr1")).rejects.toThrow(
-        "Multiple active QR codes found for this document",
+        "Multiple active QR codes found for this document"
       );
     });
 

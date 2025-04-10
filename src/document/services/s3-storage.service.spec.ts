@@ -1,117 +1,78 @@
-import { S3StorageService } from "./s3-storage.service";
+import { Test, TestingModule } from "@nestjs/testing";
+import { S3StorageService } from "../services/s3-storage.service";
 import { ConfigService } from "@nestjs/config";
 import * as AWS from "aws-sdk";
 
 describe("S3StorageService", () => {
   let service: S3StorageService;
-  let configService: Partial<ConfigService>;
+  let configService: ConfigService;
+  let s3Instance: AWS.S3;
 
-  beforeEach(() => {
-    configService = {
-      get: jest.fn((key: string) => {
-        switch (key) {
-          case "DO_SPACES_ENDPOINT":
-            return "https://do.spaces.endpoint";
-          case "DO_SPACES_KEY":
-            return "dummy-key";
-          case "DO_SPACES_SECRET":
-            return "dummy-secret";
-          case "DO_SPACES_REGION":
-            return "dummy-region";
-          default:
-            return null;
-        }
-      }),
-    };
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        S3StorageService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => {
+              const config = {
+                DO_SPACES_ENDPOINT: "https://do.spaces.endpoint",
+                DO_SPACES_KEY: "access-key",
+                DO_SPACES_SECRET: "secret-key",
+                DO_SPACES_REGION: "region-test",
+              };
+              return config[key];
+            }),
+          },
+        },
+      ],
+    }).compile();
 
-    // By default, mock AWS.S3 to simulate a successful upload returning a Location.
-    jest.spyOn(AWS, "S3").mockImplementation(
-      () =>
-        ({
-          upload: (_params: AWS.S3.PutObjectRequest) => ({
-            promise: () =>
-              Promise.resolve({
-                Location: "https://bucket.endpoint/filename.pdf",
-              }),
-          }),
-        }) as any
-    );
-
-    service = new S3StorageService(configService as ConfigService);
+    service = module.get<S3StorageService>(S3StorageService);
+    configService = module.get<ConfigService>(ConfigService);
+    // Access the private s3 instance via type casting.
+    s3Instance = (service as any).s3;
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    jest.clearAllMocks();
   });
 
   describe("uploadPDF", () => {
-    it("should upload and return the location URL", async () => {
-      const buffer = Buffer.from("pdf data");
-      const mimetype = "application/pdf";
-      const bucketName = "bucket";
-      const filename = "filename.pdf";
-
-      const location = await service.uploadPDF(
+    it("should upload PDF and return URL", async () => {
+      const fakeLocation = "https://do.spaces.endpoint/bucket/file.pdf";
+      const uploadMock = jest.spyOn(s3Instance, "upload").mockReturnValue({
+        promise: jest.fn().mockResolvedValue({ Location: fakeLocation }),
+      } as any);
+      const buffer = Buffer.from("dummy");
+      const url = await service.uploadPDF(
         buffer,
-        mimetype,
-        bucketName,
-        filename
+        "application/pdf",
+        "bucket-test",
+        "filename.pdf"
       );
-      expect(location).toBe("https://bucket.endpoint/filename.pdf");
+      expect(url).toEqual(fakeLocation);
+      expect(uploadMock).toHaveBeenCalledWith({
+        Bucket: "bucket-test",
+        Key: "filename.pdf",
+        Body: buffer,
+        ContentType: "application/pdf",
+      });
     });
 
     it("should propagate error if upload fails", async () => {
-      // Override AWS.S3 to simulate a failure.
-      jest.spyOn(service["s3"], "upload").mockImplementationOnce(
-        () =>
-          ({
-            promise: () => Promise.reject(new Error("Upload failed")),
-          }) as any
-      );
-
+      jest.spyOn(s3Instance, "upload").mockReturnValue({
+        promise: jest.fn().mockRejectedValue(new Error("Upload failed")),
+      } as any);
       await expect(
         service.uploadPDF(
-          Buffer.from("pdf"),
+          Buffer.from("dummy"),
           "application/pdf",
-          "bucket",
-          "filename.pdf",
-        ),
-      ).rejects.toThrow("Upload failed");
-    });
-
-    it("should call s3.upload with correct parameters", async () => {
-      const buffer = Buffer.from("sample data");
-      const mimetype = "application/pdf";
-      const bucketName = "test-bucket";
-      const filename = "test-file.pdf";
-
-      // Spy on the upload method to capture its parameters.
-      const uploadSpy = jest.spyOn(service["s3"], "upload").mockReturnValue({
-        promise: () =>
-          Promise.resolve({
-            Location: "url",
-            ETag: "asd",
-            Bucket: bucketName,
-            Key: filename,
-          }),
-        abort: jest.fn(),
-        send: jest.fn(),
-        on: jest.fn(),
-      });
-      jest.spyOn(AWS, "S3").mockImplementationOnce(
-        () =>
-          ({
-            upload: uploadSpy,
-          }) as any
-      );
-
-      await service.uploadPDF(buffer, mimetype, bucketName, filename);
-      expect(uploadSpy).toHaveBeenCalledWith({
-        Bucket: bucketName,
-        Key: filename,
-        Body: buffer,
-        ContentType: mimetype,
-      });
+          "bucket-test",
+          "filename.pdf"
+        )
+      ).rejects.toThrow(new Error("Upload failed"));
     });
   });
 });
