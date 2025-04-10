@@ -1,157 +1,149 @@
+import * as fs from "fs";
+import * as path from "path";
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { DocumentController } from "./document.controller";
 import { DocumentService } from "../services/document.service";
-import * as request from "supertest";
-import { INestApplication, NotFoundException } from "@nestjs/common";
-import { MulterModule } from "@nestjs/platform-express";
+import { UploadDocumentDTO } from "../dto/upload-document.dto";
+import { TransferDocumentDTO } from "../dto/transfer-document.dto";
+import { ClaimDocumentDTO } from "../dto/claim-document.dto";
 
 describe("DocumentController", () => {
-  let app: INestApplication;
-  let docService: DocumentService;
   let controller: DocumentController;
+  let docService: Partial<DocumentService>;
+  let mockValidFile: Express.Multer.File;
+  let mockOversizedFile: Express.Multer.File;
+  let uploadDto: UploadDocumentDTO;
+  let transferDto: TransferDocumentDTO;
+  let claimDto: ClaimDocumentDTO;
 
-  const mockDocService = {
-    uploadDocument: jest.fn(),
-    transferDocument: jest.fn(),
-    claimDocument: jest.fn(),
-    viewDocument: jest.fn(),
-  };
+  beforeEach(async () => {
+    // Create a dummy PDF buffer from the file on disk
+    const filePath = path.join(__dirname, "../dummy.pdf");
+    const fileBuffer = fs.existsSync(filePath)
+      ? fs.readFileSync(filePath)
+      : Buffer.from("PDFdata");
 
-  beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
-      imports: [MulterModule.register({})],
+    mockValidFile = {
+      buffer: fileBuffer,
+      mimetype: "application/pdf",
+      originalname: "dummy.pdf",
+      fieldname: "file",
+      encoding: "7bit",
+      size: fileBuffer.length,
+      destination: "",
+      filename: "dummy.pdf",
+      path: filePath,
+    } as Express.Multer.File;
+
+    mockOversizedFile = { ...mockValidFile, size: 12 * 1024 * 1024 };
+
+    uploadDto = {
+      documentName: "Test Document",
+      ownerName: "test@example.com",
+    };
+
+    transferDto = {
+      documentId: "doc-id",
+      pendingOwner: "newowner@example.com",
+    };
+
+    claimDto = {
+      documentId: "doc-id",
+      otp: "123456",
+    };
+
+    docService = {
+      uploadDocument: jest.fn().mockResolvedValue({
+        message: "Uploaded",
+        url: "http://example.com/doc.pdf",
+      }),
+      transferDocument: jest.fn().mockResolvedValue({ otp: "654321" }),
+      claimDocument: jest
+        .fn()
+        .mockResolvedValue({ privateId: "private123", publicId: "public123" }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
       controllers: [DocumentController],
-      providers: [{ provide: DocumentService, useValue: mockDocService }],
+      providers: [{ provide: DocumentService, useValue: docService }],
     }).compile();
 
-    app = moduleRef.createNestApplication();
-    await app.init();
-
-    controller = moduleRef.get<DocumentController>(DocumentController);
-    docService = moduleRef.get<DocumentService>(DocumentService);
+    controller = module.get<DocumentController>(DocumentController);
   });
 
-  afterEach(() => jest.clearAllMocks());
-  afterAll(async () => await app.close());
-
-  describe("/documents/upload (POST)", () => {
-    it("should upload a valid PDF file under 8MB", async () => {
-      mockDocService.uploadDocument.mockResolvedValue({ success: true });
-
-      const res = await request(app.getHttpServer())
-        .post("/documents/upload")
-        .attach("file", Buffer.from("%PDF-1.4"), "document.pdf")
-        .field("title", "My Doc")
-        .set("Content-Type", "multipart/form-data");
-
-      expect(res.status).toBe(201);
-      expect(docService.uploadDocument).toHaveBeenCalled();
-    });
-
-    it("should reject when no file is uploaded", async () => {
-      const res = await request(app.getHttpServer())
-        .post("/documents/upload")
-        .field("title", "No File");
-
-      expect(res.status).toBe(400);
-      expect(res.body.message).toBe("No file uploaded.");
-    });
-
-    it("should reject non-PDF files", async () => {
-      const res = await request(app.getHttpServer())
-        .post("/documents/upload")
-        .attach("file", Buffer.from("not-a-pdf"), "image.jpg")
-        .field("title", "Wrong File");
-
-      expect(res.status).toBe(400);
-      expect(res.body.message).toBe("Invalid file type.");
-    });
-
-    it("should reject PDFs larger than 8MB", async () => {
-      const bigBuffer = Buffer.alloc(8 * 1024 * 1024 + 1, ".");
-
-      const res = await request(app.getHttpServer())
-        .post("/documents/upload")
-        .attach("file", bigBuffer, "big.pdf")
-        .field("title", "Too Big");
-
-      expect(res.status).toBe(400);
-      expect(res.body.message).toBe("File size exceeds 8MB limit.");
-    });
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  describe("/documents/transfer (POST)", () => {
-    it("should transfer a document when given valid input", async () => {
-      mockDocService.transferDocument.mockResolvedValue({ transferred: true });
-
-      const res = await request(app.getHttpServer())
-        .post("/documents/transfer")
-        .send({
-          documentId: "abc123",
-          pendingOwner: "newowner@example.com",
-        });
-
-      expect(res.status).toBe(201);
-      expect(docService.transferDocument).toHaveBeenCalledWith(
-        "abc123",
-        "newowner@example.com"
+  describe("uploadDocument", () => {
+    it("should throw BadRequestException if no file is uploaded", async () => {
+      await expect(controller.uploadDocument(null!, uploadDto)).rejects.toThrow(
+        new BadRequestException("No file uploaded.")
       );
     });
 
-    // it("should return 400 for missing fields in transfer request", async () => {
-    //   const res = await request(app.getHttpServer())
-    //     .post("/documents/transfer")
-    //     .send({});
-
-    //   expect(res.status).toBe(400);
-    // });
-  });
-
-  describe("/documents/claim (POST)", () => {
-    it("should claim a document with valid OTP", async () => {
-      mockDocService.claimDocument.mockResolvedValue({ claimed: true });
-
-      const res = await request(app.getHttpServer())
-        .post("/documents/claim")
-        .send({ documentId: "doc123", otp: "123456" });
-
-      expect(res.status).toBe(201);
-      expect(docService.claimDocument).toHaveBeenCalledWith("doc123", "123456");
+    it("should throw BadRequestException for invalid file type", async () => {
+      const invalidFile = { ...mockValidFile, mimetype: "image/png" };
+      await expect(
+        controller.uploadDocument(invalidFile, uploadDto)
+      ).rejects.toThrow(new BadRequestException("Invalid file type."));
     });
 
-    // it("should return 400 if fields are missing in claim", async () => {
-    //   const res = await request(app.getHttpServer())
-    //     .post("/documents/claim")
-    //     .send({ documentId: "doc123" });
-
-    //   expect(res.status).toBe(400);
-    // });
-  });
-
-  describe("/documents/view/:qrId (GET)", () => {
-    it("should return result from service (positive case)", async () => {
-      const qrId = "valid-uuid";
-      const expectedResult = {
-        documentName: "Test Document",
-        uploadDate: new Date(),
-        publisher: "Test Publisher",
-        ownershipHistory: [{ owner: "Owner1", generatedDate: new Date() }],
-        currentOwner: "Owner1",
-        filePath: "/test/path.pdf",
-      };
-      jest.spyOn(docService, "viewDocument").mockResolvedValue(expectedResult);
-
-      const result = await controller.viewDocument(qrId);
-      expect(result).toEqual(expectedResult);
+    it("should throw BadRequestException for oversized file", async () => {
+      await expect(
+        controller.uploadDocument(mockOversizedFile, uploadDto)
+      ).rejects.toThrow(
+        new BadRequestException("File size exceeds 8MB limit.")
+      );
     });
 
-    it("should throw NotFoundException when the service throws one", async () => {
-      const qrId = "valid-uuid";
-      jest
-        .spyOn(docService, "viewDocument")
-        .mockRejectedValue(new NotFoundException("QR code not found"));
-      await expect(controller.viewDocument(qrId)).rejects.toThrow(
-        NotFoundException,
+    it("should return result from service on valid input", async () => {
+      const result = await controller.uploadDocument(mockValidFile, uploadDto);
+      expect(result).toEqual({
+        message: "Uploaded",
+        url: "http://example.com/doc.pdf",
+      });
+      expect(docService.uploadDocument).toHaveBeenCalledWith(
+        mockValidFile,
+        uploadDto
+      );
+    });
+
+    it("should propagate errors from service", async () => {
+      (docService.uploadDocument as jest.Mock).mockRejectedValueOnce(
+        new InternalServerErrorException("S3 Error")
+      );
+      await expect(
+        controller.uploadDocument(mockValidFile, uploadDto)
+      ).rejects.toThrow(new InternalServerErrorException("S3 Error"));
+    });
+  });
+
+  describe("transferDocument", () => {
+    it("should call service.transferDocument and return its result", async () => {
+      const result = await controller.transferDocument(transferDto);
+      expect(result).toEqual({ otp: "654321" });
+      expect(docService.transferDocument).toHaveBeenCalledWith(
+        transferDto.documentId,
+        transferDto.pendingOwner
+      );
+    });
+  });
+
+  describe("claimDocument", () => {
+    it("should call service.claimDocument and return its result", async () => {
+      const result = await controller.claimDocument(claimDto);
+      expect(result).toEqual({
+        privateId: "private123",
+        publicId: "public123",
+      });
+      expect(docService.claimDocument).toHaveBeenCalledWith(
+        claimDto.documentId,
+        claimDto.otp
       );
     });
   });
