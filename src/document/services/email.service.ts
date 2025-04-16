@@ -9,6 +9,7 @@ export class EmailService {
   constructor(private configService: ConfigService) {
     this.transporter = nodemailer.createTransport({
       service: "gmail",
+      secure: true,
       auth: {
         user: configService.get<string>("GMAIL_USER"),
         pass: configService.get<string>("GMAIL_PASS"),
