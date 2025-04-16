@@ -1,11 +1,16 @@
 import { ConfigService } from "@nestjs/config";
 import { DocumentRepository } from "../repositories/document.repository";
 import { EmailService } from "./email.service";
-import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
 import { S3StorageService } from "./s3-storage.service";
 import { UploadDocumentDTO } from "../dto/upload-document.dto";
 import { randomInt } from "crypto";
 import { PrismaService } from "../../prisma/prisma.service";
+import { PostHogService } from "../../posthog/posthog.service";
 
 @Injectable()
 export class DocumentService {
@@ -14,18 +19,25 @@ export class DocumentService {
     private readonly documentRepo: DocumentRepository,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
+    private readonly posthogService: PostHogService,
+    private readonly prisma: PrismaService
   ) {}
 
   async uploadDocument(pdf: Express.Multer.File, dto: UploadDocumentDTO) {
     const bucketName = this.getBucketName();
     const filename = this.generateFilename(dto, Date.now());
 
+    await this.posthogService.captureEvent(dto.ownerName, "document_upload", {
+      filename,
+      ownerName: dto.ownerName,
+      timestamp: Date.now(),
+    });
+
     const url = await this.s3Storage.uploadPDF(
       pdf.buffer,
       pdf.mimetype,
       bucketName,
-      filename,
+      filename
     );
 
     return this.documentRepo.createDocument({
@@ -40,6 +52,11 @@ export class DocumentService {
     const document = await this.documentRepo.findDocumentById(documentId);
     const otp = randomInt(0, 1_000_000).toString().padStart(6, "0");
 
+    await this.posthogService.captureEvent(pendingOwner, "document_transfer", {
+      documentId,
+      timestamp: new Date().toISOString(),
+    });
+
     await this.documentRepo.updateDocument(documentId, {
       pendingOwner: pendingOwner,
       otp,
@@ -52,7 +69,7 @@ export class DocumentService {
       document.documentName,
       this.getCurrentOwner(document),
       document.publisher,
-      documentId,
+      documentId
     );
 
     return { otp: otp };
@@ -61,6 +78,12 @@ export class DocumentService {
   async claimDocument(documentId: string, otp: string) {
     return await this.prisma.$transaction(async (transaction) => {
       const document = await this.documentRepo.findDocumentById(documentId);
+
+      await this.posthogService.captureEvent(documentId, "document_claim", {
+        documentId,
+        otp,
+        timestamp: Date.now(),
+      });
 
       if (!document.pendingOwner)
         throw new BadRequestException("No pending transfer.");
@@ -74,7 +97,7 @@ export class DocumentService {
       const qrCodeIds = await this.documentRepo.changeOwnership(
         transaction,
         document.pendingOwner,
-        documentId,
+        documentId
       );
 
       const updateData = {
@@ -87,7 +110,7 @@ export class DocumentService {
       await this.documentRepo.updateDocument(
         documentId,
         updateData,
-        transaction,
+        transaction
       );
 
       return qrCodeIds;

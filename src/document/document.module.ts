@@ -5,10 +5,12 @@ import { DocumentService } from "./services/document.service";
 import { S3StorageService } from "./services/s3-storage.service";
 import { EmailService } from "./services/email.service";
 import { DocumentRepository } from "./repositories/document.repository";
+import { PostHogModule } from "../posthog/posthog.module";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConfigService } from "@nestjs/config";
 
 @Module({
+  imports: [PostHogModule],
   controllers: [DocumentController],
   providers: [
     DocumentService,
