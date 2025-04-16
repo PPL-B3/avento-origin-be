@@ -1,12 +1,14 @@
 import { EmailService } from "./email.service";
 import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
+import { DocumentRepository } from "../repositories/document.repository";
 
 jest.mock("nodemailer");
 
 describe("EmailService", () => {
   let emailService: EmailService;
   let configService: Partial<ConfigService>;
+  let documentRepo: Partial<DocumentRepository>;
   let sendMailMock: jest.Mock;
 
   beforeEach(() => {
@@ -15,8 +17,13 @@ describe("EmailService", () => {
       get: jest.fn((key: string) => {
         if (key === "GMAIL_USER") return "test@gmail.com";
         if (key === "GMAIL_PASS") return "secret";
+        if (key === "FE_URL") return "http://sample-url.com";
         return null;
       }),
+    };
+
+    documentRepo = {
+      findDocumentById: jest.fn(),
     };
 
     // Create a fake transporter with sendMail method.
@@ -25,7 +32,10 @@ describe("EmailService", () => {
       sendMail: sendMailMock,
     });
 
-    emailService = new EmailService(configService as ConfigService);
+    emailService = new EmailService(
+      configService as ConfigService,
+      documentRepo as DocumentRepository,
+    );
   });
 
   describe("sendOwnershipTransferEmail", () => {
@@ -36,6 +46,17 @@ describe("EmailService", () => {
     const documentId = "doc-123";
 
     it("should send an email with correct content", async () => {
+      const fakeDocument = {
+        documentID: documentId,
+        qrCode: [
+          { id: "qr-private", isPrivate: true },
+          { id: "qr-public", isPrivate: false },
+        ],
+      };
+      (documentRepo.findDocumentById as jest.Mock).mockResolvedValue(
+        fakeDocument,
+      );
+
       await emailService.sendOwnershipTransferEmail(
         email,
         documentName,
@@ -54,10 +75,20 @@ describe("EmailService", () => {
       expect(callArgs.html).toContain(`<code>${owner}</code>`);
       expect(callArgs.html).toContain(`<code>${documentName}</code>`);
       expect(callArgs.html).toContain(`<code>${publisher}</code>`);
-      expect(callArgs.html).toContain(`http://sample-url.com/${documentId}`);
+      expect(callArgs.html).toContain(`http://sample-url.com/transfer-request`);
     });
 
     it("should propagate errors thrown by sendMail", async () => {
+      const fakeDocument = {
+        documentID: documentId,
+        qrCode: [
+          { id: "qr-private", isPrivate: true },
+          { id: "qr-public", isPrivate: false },
+        ],
+      };
+      (documentRepo.findDocumentById as jest.Mock).mockResolvedValue(
+        fakeDocument,
+      );
       sendMailMock.mockRejectedValueOnce(new Error("Send failed"));
       await expect(
         emailService.sendOwnershipTransferEmail(

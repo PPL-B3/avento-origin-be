@@ -8,9 +8,10 @@ import { DocumentRepository } from "./repositories/document.repository";
 import { PostHogModule } from "../posthog/posthog.module";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConfigService } from "@nestjs/config";
+import { AuditLogModule } from "../auditLog/auditLog.module";
 
 @Module({
-  imports: [PostHogModule],
+  imports: [PostHogModule, AuditLogModule],
   controllers: [DocumentController],
   providers: [
     DocumentService,

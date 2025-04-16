@@ -46,7 +46,7 @@ export class DocumentRepository {
     transactions: Prisma.TransactionClient,
     owner: string,
     documentId: string,
-  ): Promise<{ privateId: string; publicId: string }> {
+  ): Promise<{ privateId: string; publicId: string; documentId: string }> {
     const qrCodeBatch = this.createQrCodeBatch(owner, documentId);
 
     const qrCodes = await Promise.all(
@@ -68,6 +68,7 @@ export class DocumentRepository {
     return {
       privateId: privateQr.id,
       publicId: publicQr.id,
+      documentId: documentId,
     };
   }
 
@@ -77,7 +78,13 @@ export class DocumentRepository {
   ) {
     const document = await transaction.document.findUnique({
       where: { documentID: documentId },
-      include: { qrCode: true },
+      include: {
+        qrCode: {
+          orderBy: {
+            generatedDate: "asc",
+          },
+        },
+      },
     });
     if (!document) throw new BadRequestException("Document not found.");
     return document;

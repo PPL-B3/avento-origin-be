@@ -69,6 +69,9 @@ jobs:
             DO_SPACES_ENDPOINT=${{ secrets.DO_SPACES_ENDPOINT }}
             DO_SPACES_KEY=${{ secrets.DO_SPACES_KEY }}
             DO_SPACES_SECRET=${{ secrets.DO_SPACES_SECRET }}
+            GMAIL_USER=${{ secrets.GMAIL_USER }}
+            GMAIL_PASS=${{ secrets.GMAIL_PASS }}
+            FE_URL=${{ secrets.FE_URL }}
           EOF
       
       - name: Set up ssh key
