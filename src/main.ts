@@ -3,13 +3,26 @@ import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
+import { HighlightInterceptor, H } from "@highlight-run/nest";
+
+const env = {
+  projectID: "ng2z350g",
+  serviceName: "my-nestjs-app",
+  serviceVersion: "git-sha",
+  environment: "development",
+  debug: false,
+};
 
 async function bootstrap() {
+  H.init(env);
+
   const app = await NestFactory.create(AppModule);
+  app.useGlobalInterceptors(new HighlightInterceptor(env));
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-    }),
+    })
   );
   app.enableCors();
   app.useGlobalPipes(new ValidationPipe());
@@ -26,7 +39,7 @@ async function bootstrap() {
   SwaggerModule.setup(
     configService.get<string>("API_ENDPOINT", "api-default"),
     app,
-    documentFactory,
+    documentFactory
   );
 
   await app.listen(process.env.PORT ?? 4000);
