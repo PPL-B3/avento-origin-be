@@ -151,8 +151,20 @@ describe("DocumentController", () => {
         .spyOn(docService, "viewDocument")
         .mockRejectedValue(new NotFoundException("QR code not found"));
       await expect(controller.viewDocument(qrId)).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
+    });
+  });
+
+  describe("/documents/test-error (GET)", () => {
+    it("should throw an error and return a 500 status", async () => {
+      const res = await request(app.getHttpServer()).get(
+        "/documents/test-error"
+      );
+
+      // Expect the error handler to catch the error and return 500
+      expect(res.status).toBe(500);
+      expect(res.body.message).toBe("Internal server error");
     });
   });
 });

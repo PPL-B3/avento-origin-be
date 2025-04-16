@@ -14,7 +14,12 @@ import { DocumentService } from "../services/document.service";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { TransferDocumentDTO } from "../dto/transfer-document.dto";
 import { UploadDocumentDTO } from "../dto/upload-document.dto";
-import { ApiBody, ApiConsumes, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+} from "@nestjs/swagger";
 
 @Controller("documents")
 export class DocumentController {
@@ -67,7 +72,7 @@ export class DocumentController {
   @ApiResponse({ status: 500, description: "Internal Server Error" })
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: UploadDocumentDTO,
+    @Body() body: UploadDocumentDTO
   ) {
     if (!file) {
       throw new BadRequestException("No file uploaded.");
@@ -86,7 +91,7 @@ export class DocumentController {
   async transferDocument(@Body() body: TransferDocumentDTO) {
     return await this.docService.transferDocument(
       body.documentId,
-      body.pendingOwner,
+      body.pendingOwner
     );
   }
 
@@ -98,5 +103,12 @@ export class DocumentController {
   @Get("view/:qrId")
   async viewDocument(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
     return await this.docService.viewDocument(qrId);
+  }
+
+  @Get("test-error")
+  testError(): never {
+    throw new Error(
+      "This is a test error. Should always trigger error handler."
+    );
   }
 }

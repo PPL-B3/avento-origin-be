@@ -26,7 +26,7 @@ describe("DocumentService", () => {
     } as any;
     email = { sendOwnershipTransferEmail: jest.fn() } as any;
     config = { get: jest.fn() } as any;
-    // For simplicity, let $transaction just call the passed callback with a dummy transaction (here, using prisma as the transaction client)
+    const posthog = { captureEvent: jest.fn() } as any;
     prisma = {
       $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
       user: {
@@ -45,6 +45,7 @@ describe("DocumentService", () => {
       repo,
       email,
       config,
+      posthog,
       prisma,
       auditLog,
     );
@@ -342,7 +343,7 @@ describe("DocumentService", () => {
     it("should throw NotFoundException if QR code is not found", async () => {
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
       await expect(service.viewDocument("non-existent-id")).rejects.toThrow(
-        new NotFoundException("QR code not found"),
+        new NotFoundException("QR code not found")
       );
     });
 
@@ -386,7 +387,7 @@ describe("DocumentService", () => {
 
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
       await expect(service.viewDocument("qr1")).rejects.toThrow(
-        new NotFoundException("No active QR code found for this document"),
+        new NotFoundException("No active QR code found for this document")
       );
     });
 
@@ -438,7 +439,7 @@ describe("DocumentService", () => {
 
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
       await expect(service.viewDocument("qr1")).rejects.toThrow(
-        "Multiple active QR codes found for this document",
+        "Multiple active QR codes found for this document"
       );
     });
 
