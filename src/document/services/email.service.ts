@@ -5,11 +5,11 @@ import { DocumentRepository } from "../repositories/document.repository";
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private readonly transporter: nodemailer.Transporter;
 
   constructor(
-    private configService: ConfigService,
-    private documentRepo: DocumentRepository,
+    private readonly configService: ConfigService,
+    private readonly documentRepo: DocumentRepository,
   ) {
     this.transporter = nodemailer.createTransport({
       service: "gmail",
