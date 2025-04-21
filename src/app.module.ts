@@ -1,6 +1,8 @@
 import {
+  MiddlewareConsumer,
   // MiddlewareConsumer,
   Module,
+  NestModule,
   // NestModule,
   // RequestMethod,
 } from "@nestjs/common";
@@ -9,10 +11,10 @@ import { HelloModule } from "./hello/hello.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { PrismaService } from "./prisma/prisma.service";
 import { AuthModule } from "./auth/auth.module";
-// import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 import { ConfigModule } from "@nestjs/config";
 import { PrometheusModule } from "@willsoto/nestjs-prometheus";
 import { AuditLogModule } from "./auditLog/auditLog.module";
+import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 
 @Module({
   imports: [
@@ -28,15 +30,8 @@ import { AuditLogModule } from "./auditLog/auditLog.module";
   ],
   providers: [PrismaService],
 })
-export class AppModule {}
-// export class AppModule implements NestModule {
-//   configure(consumer: MiddlewareConsumer) {
-//     consumer
-//       .apply(JwtAuthMiddleware)
-//       .exclude(
-//         { path: "auth/register", method: RequestMethod.POST },
-//         { path: "auth/login", method: RequestMethod.POST }
-//       )
-//       .forRoutes("*"); // semua route pakai middleware ini.
-//   }
-// }
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(JwtAuthMiddleware).forRoutes("documents/upload");
+  }
+}
