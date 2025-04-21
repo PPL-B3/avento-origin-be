@@ -12,6 +12,7 @@ describe("DocumentController", () => {
 
   const mockDocService = {
     uploadDocument: jest.fn(),
+    requestQrCodeOTP: jest.fn(),
     transferDocument: jest.fn(),
     claimDocument: jest.fn(),
     viewDocument: jest.fn(),
@@ -165,6 +166,49 @@ describe("DocumentController", () => {
       // Expect the error handler to catch the error and return 500
       expect(res.status).toBe(500);
       expect(res.body.message).toBe("Internal server error");
+    });
+  });
+
+  describe("/documents/access/:qrId (GET)", () => {
+    const validQrId = "123e4567-e89b-12d3-a456-426614174000"; // valid UUID format
+
+    it("should request OTP successfully", async () => {
+      const mockResponse = { owner: "owner@example.com", document: "Test Doc" };
+      mockDocService.requestQrCodeOTP.mockResolvedValue(mockResponse);
+
+      const res = await request(app.getHttpServer()).get(
+        `/documents/access/${validQrId}`
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(mockResponse);
+      expect(docService.requestQrCodeOTP).toHaveBeenCalledWith(validQrId);
+    });
+
+    it("should return 400 if qrId is not a valid UUID", async () => {
+      const invalidQrId = "invalid-uuid";
+
+      const res = await request(app.getHttpServer()).get(
+        `/documents/access/${invalidQrId}`
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain(
+        "Validation failed (uuid is expected)"
+      );
+    });
+
+    it("should return appropriate error if service throws", async () => {
+      mockDocService.requestQrCodeOTP.mockRejectedValue(
+        new NotFoundException("QR Code not found")
+      );
+
+      const res = await request(app.getHttpServer()).get(
+        `/documents/access/${validQrId}`
+      );
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toBe("QR Code not found");
     });
   });
 });
