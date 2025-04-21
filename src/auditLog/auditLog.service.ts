@@ -18,11 +18,11 @@ export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async addAuditLog({
-                      eventType,
-                      userID,
-                      details,
-                      documentID,
-                    }: {
+    eventType,
+    userID,
+    details,
+    documentID,
+  }: {
     eventType: string;
     userID: string;
     details: string;
@@ -61,8 +61,8 @@ export class AuditLogService {
 
   async getFilteredAuditLogs(filter: AuditLogFilter = {}) {
     // Default pagination values
-    const page = filter.page || 1;
-    const limit = filter.limit || 10;
+    const page = filter.page ?? 1;
+    const limit = filter.limit ?? 10;
     const skip = (page - 1) * limit;
 
     // Build the where clause based on filters
