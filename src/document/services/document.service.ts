@@ -206,14 +206,14 @@ export class DocumentService {
     if (!qrCode) {
       throw new NotFoundException("QR code not found");
     }
+    if (!qrCode.isActive) {
+      throw new BadRequestException("QR code is not active");
+    }
 
     const document = qrCode.document;
     const allQrCodes = document.qrCode;
     const activeQRCodes = allQrCodes.filter((code) => code.isActive);
 
-    if (activeQRCodes.length === 0) {
-      throw new NotFoundException("No active QR code found for this document");
-    }
     if (activeQRCodes.length > 2) {
       throw new Error("Multiple active QR codes found for this document");
     }
