@@ -353,52 +353,31 @@ describe("DocumentService", () => {
     it("should throw NotFoundException if QR code is not found", async () => {
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
       await expect(service.viewDocument("non-existent-id")).rejects.toThrow(
-        new NotFoundException("QR code not found")
+        new NotFoundException("QR code not found"),
       );
     });
 
-    it("should throw NotFoundException if no active QR codes are found", async () => {
-      const fakeDocument = {
-        documentID: "doc123",
-        documentName: "Test Doc",
-        uploadDate: new Date("2025-04-05T12:00:00Z"),
-        publisher: "Test Publisher",
-        filePath: "/path/to/file",
-        // All QR codes are inactive.
-        qrCode: [
-          {
-            id: "qr1",
-            owner: "Alice",
-            isActive: false,
-            isPrivate: true,
-            generatedDate: new Date("2025-04-05T10:00:00Z"),
-            documentId: "doc123",
-          },
-          {
-            id: "qr2",
-            owner: "Alice",
-            isActive: false,
-            isPrivate: false,
-            generatedDate: new Date("2025-04-05T10:00:00Z"),
-            documentId: "doc123",
-          },
-        ],
-      };
-
-      const fakeQrCode = {
-        id: "qr1",
-        owner: "Alice",
+    it("should throw BadRequestException when QR code is not active", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue({
+        id: "qr-inactive",
         isActive: false,
-        isPrivate: true,
-        generatedDate: new Date("2025-04-05T10:00:00Z"),
-        documentId: "doc123",
-        document: fakeDocument,
-      };
+      } as any);
 
-      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
-      await expect(service.viewDocument("qr1")).rejects.toThrow(
-        new NotFoundException("No active QR code found for this document")
+      await expect(service.viewDocument("qr-inactive")).rejects.toThrow(
+        new BadRequestException("QR code is not active"),
       );
+      expect(prisma.qrCode.findUnique).toHaveBeenCalledWith({
+        where: { id: "qr-inactive" },
+        include: {
+          document: {
+            include: {
+              qrCode: {
+                orderBy: { generatedDate: "asc" },
+              },
+            },
+          },
+        },
+      });
     });
 
     it("should throw error if more than 2 active QR codes are found", async () => {
