@@ -9,7 +9,7 @@ export class EmailService {
 
   constructor(
     private configService: ConfigService,
-    private documentRepo: DocumentRepository,
+    private documentRepo: DocumentRepository
   ) {
     this.transporter = nodemailer.createTransport({
       service: "gmail",
@@ -25,7 +25,7 @@ export class EmailService {
     documentName: string,
     owner: string,
     publisher: string,
-    documentId: string,
+    documentId: string
   ): Promise<void> {
     const document = await this.documentRepo.findDocumentById(documentId);
     const qrCodes = document.qrCode.slice(-2);
@@ -40,6 +40,25 @@ export class EmailService {
       from: `"Avento Origin" <${this.configService.get<string>("GMAIL_USER")}>`,
       to: email,
       subject: "Tautan Pengalihan Kepemilikan Dokumen",
+      html: htmlContent,
+    });
+  }
+
+  async sendPrivateAccessEmail(
+    email: string,
+    otp: string,
+    documentName: string
+  ): Promise<void> {
+    const htmlContent = `
+      <p>Anda telah meminta akses ke dokumen pribadi berjudul <code>${documentName}</code>.</p>
+      <p>Gunakan OTP berikut untuk melanjutkan: <strong>${otp}</strong>.</p>
+      <p>OTP ini berlaku selama 8 menit. Jangan bagikan OTP ini kepada siapapun.</p>
+    `;
+
+    await this.transporter.sendMail({
+      from: `"Avento Origin" <${this.configService.get<string>("GMAIL_USER")}>`,
+      to: email,
+      subject: "Akses Dokumen Pribadi",
       html: htmlContent,
     });
   }
