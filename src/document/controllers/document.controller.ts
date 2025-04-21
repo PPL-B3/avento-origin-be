@@ -105,6 +105,11 @@ export class DocumentController {
     return await this.docService.viewDocument(qrId);
   }
 
+  @Get("access/:qrId")
+  async requestOtp(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
+    return await this.docService.requestQrCodeOTP(qrId);
+  }
+
   @Get("test-error")
   testError(): never {
     throw new Error(
