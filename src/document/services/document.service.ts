@@ -25,13 +25,22 @@ export class DocumentService {
     private readonly auditLogService: AuditLogService,
   ) {}
 
-  async uploadDocument(pdf: Express.Multer.File, dto: UploadDocumentDTO) {
+  async uploadDocument(
+    pdf: Express.Multer.File,
+    dto: UploadDocumentDTO,
+    userId: string,
+  ) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: {
+        id: userId,
+      },
+    });
     const bucketName = this.getBucketName();
-    const filename = this.generateFilename(dto, Date.now());
+    const filename = this.generateFilename(dto, Date.now(), user.email);
 
-    await this.posthogService.captureEvent(dto.ownerName, "document_upload", {
+    await this.posthogService.captureEvent(user.email, "document_upload", {
       filename,
-      ownerName: dto.ownerName,
+      ownerName: user.email,
       timestamp: Date.now(),
     });
 
@@ -39,28 +48,22 @@ export class DocumentService {
       pdf.buffer,
       pdf.mimetype,
       bucketName,
-      filename
+      filename,
     );
 
     const createdDocument = await this.documentRepo.createDocument({
       documentName: dto.documentName,
       filePath: url,
       uploadDate: new Date(),
-      publisher: dto.ownerName,
+      publisher: user.email,
     });
 
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.ownerName },
+    await this.auditLogService.addAuditLog({
+      eventType: "UPLOAD_DOCUMENT",
+      userID: user.id,
+      details: `Document "${dto.documentName}" uploaded.`,
+      documentID: createdDocument.documentId,
     });
-
-    if (user) {
-      await this.auditLogService.addAuditLog({
-        eventType: "UPLOAD_DOCUMENT",
-        userID: user.id,
-        details: `Document "${dto.documentName}" uploaded.`,
-        documentID: createdDocument.documentId,
-      });
-    }
 
     return {
       privateId: createdDocument.privateId,
@@ -100,7 +103,7 @@ export class DocumentService {
       document.documentName,
       this.getCurrentOwner(document),
       document.publisher,
-      documentId
+      documentId,
     );
 
     return { otp: otp };
@@ -161,9 +164,13 @@ export class DocumentService {
     return bucketName;
   }
 
-  private generateFilename(dto: UploadDocumentDTO, timestamp: number): string {
+  private generateFilename(
+    dto: UploadDocumentDTO,
+    timestamp: number,
+    owner: string,
+  ): string {
     const sanitize = (str: string) => str.replace(/\s+/g, "-");
-    return `${sanitize(dto.ownerName)}_${sanitize(dto.documentName)}_${timestamp}.pdf`;
+    return `${sanitize(owner)}_${sanitize(dto.documentName)}_${timestamp}.pdf`;
   }
 
   private getCurrentOwner(document) {
