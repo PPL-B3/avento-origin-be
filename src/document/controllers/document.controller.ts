@@ -21,7 +21,7 @@ import {
   ApiOperation,
   ApiResponse,
 } from "@nestjs/swagger";
-import { Request } from "supertest";
+import { Request } from "express";
 
 @Controller("documents")
 export class DocumentController {
@@ -98,7 +98,7 @@ export class DocumentController {
   async transferDocument(@Body() body: TransferDocumentDTO) {
     return await this.docService.transferDocument(
       body.documentId,
-      body.pendingOwner
+      body.pendingOwner,
     );
   }
 
@@ -115,7 +115,7 @@ export class DocumentController {
   @Get("test-error")
   testError(): never {
     throw new Error(
-      "This is a test error. Should always trigger error handler."
+      "This is a test error. Should always trigger error handler.",
     );
   }
 }
