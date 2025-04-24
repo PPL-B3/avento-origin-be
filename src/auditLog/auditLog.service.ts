@@ -142,34 +142,44 @@ export class AuditLogService {
     };
   }
 
-  async getEventTypes(): Promise<string[]> {
-    return this.getUniqueFieldValues("eventType");
+  // Get all unique event types for filter dropdown
+  async getEventTypes() {
+    const results = await this.prisma.auditLog.findMany({
+      select: {
+        eventType: true,
+      },
+      distinct: ["eventType"],
+    });
+
+    return results.map((item) => item.eventType);
   }
 
   // Get all unique user IDs for filter dropdown
-  async getUserIDs(): Promise<string[]> {
-    return this.getUniqueFieldValues("userID");
+  async getUserIDs() {
+    const results = await this.prisma.auditLog.findMany({
+      select: {
+        userID: true,
+      },
+      distinct: ["userID"],
+    });
+
+    return results.map((item) => item.userID);
   }
 
   // Get all unique document IDs for filter dropdown
-  async getDocumentIDs(): Promise<string[]> {
-    // exclude nulls
-    return this.getUniqueFieldValues("documentID", {
-      documentID: { not: null },
-    });
-  }
-
-  private async getUniqueFieldValues(
-    field: keyof Prisma.AuditLogWhereInput,
-    where?: Prisma.AuditLogWhereInput
-  ): Promise<string[]> {
+  async getDocumentIDs() {
     const results = await this.prisma.auditLog.findMany({
-      where,
-      select: { [field]: true } as any,
-      distinct: [field as string],
+      where: {
+        documentID: {
+          not: null,
+        },
+      },
+      select: {
+        documentID: true,
+      },
+      distinct: ["documentID"],
     });
-    return (results as any[])
-      .map((item) => item[field])
-      .filter((v): v is string => Boolean(v));
+
+    return results.map((item) => item.documentID).filter(Boolean);
   }
 }
