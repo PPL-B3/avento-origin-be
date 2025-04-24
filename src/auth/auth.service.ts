@@ -71,7 +71,6 @@ export class AuthService {
         data: {
           email: dto.email,
           password: hash,
-          role: "user",
           lastLogout: BigInt(Date.now()),
         },
       });

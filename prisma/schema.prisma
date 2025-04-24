@@ -14,6 +14,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+    USER
+    ADMIN
+}
+
 model Message {
   id        Int      @id @default(autoincrement())
   content   String
@@ -26,7 +31,7 @@ model User {
   id         String @id @default(uuid())
   email      String @unique
   password   String
-  role       String
+  role       Role @default(USER)
   lastLogout BigInt
 
   @@map("users")
