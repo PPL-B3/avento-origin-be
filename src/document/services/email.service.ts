@@ -12,6 +12,7 @@ export class EmailService {
     private readonly documentRepo: DocumentRepository,
   ) {
     this.transporter = nodemailer.createTransport({
+      secure: true,
       service: "gmail",
       auth: {
         user: configService.get<string>("GMAIL_USER"),
