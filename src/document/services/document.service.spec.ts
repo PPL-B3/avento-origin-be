@@ -364,7 +364,7 @@ describe("DocumentService", () => {
       } as any);
 
       await expect(service.viewDocument("qr-inactive")).rejects.toThrow(
-        new BadRequestException("QR code is not active"),
+        new BadRequestException("QR code exists but is inactive"),
       );
       expect(prisma.qrCode.findUnique).toHaveBeenCalledWith({
         where: { id: "qr-inactive" },
