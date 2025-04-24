@@ -22,7 +22,7 @@ export class DocumentService {
     private readonly configService: ConfigService,
     private readonly posthogService: PostHogService,
     private readonly prisma: PrismaService,
-    private readonly auditLogService: AuditLogService,
+    private readonly auditLogService: AuditLogService
   ) {}
 
   async uploadDocument(
@@ -71,9 +71,54 @@ export class DocumentService {
     };
   }
 
+  async requestQrCodeOTP(qrId: string) {
+    const qrCode = await this.prisma.qrCode.findUnique({
+      where: { id: qrId },
+      include: { document: true },
+    });
+
+    if (!qrCode || !qrCode.isActive || !qrCode.isPrivate) {
+      throw new BadRequestException("This QR code isn't for OTP requests.");
+    }
+
+    let qrOTP = await this.prisma.qrCodeOTP.findUnique({
+      where: { qrCodeId: qrId },
+    });
+
+    const otp = this.generateOtp();
+    if (!qrOTP) {
+      await this.prisma.qrCodeOTP.create({
+        data: {
+          qrCodeId: qrId,
+          otp,
+          expiry: new Date(Date.now() + 8 * 60 * 1000), // 8 min.
+          attemptCount: 0,
+          cooldown: new Date(Date.now()),
+        },
+      });
+    } else {
+      const now = new Date();
+      if (now > qrOTP.expiry) {
+        throw new BadRequestException("OTP expired. Please request a new one.");
+      }
+      if (now < qrOTP.cooldown) {
+        const remainingMs = qrOTP.cooldown.getTime() - now.getTime();
+        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+        throw new BadRequestException(`Retry in ${remainingMinutes} min(s).`);
+      }
+    }
+
+    await this.emailService.sendPrivateAccessEmail(
+      qrCode.owner,
+      otp,
+      qrCode.document.documentName
+    );
+    return { owner: qrCode.owner, document: qrCode.document.documentName };
+  }
+
   async transferDocument(documentId: string, pendingOwner: string) {
     const document = await this.documentRepo.findDocumentById(documentId);
-    const otp = randomInt(0, 1_000_000).toString().padStart(6, "0");
+    const otp = this.generateOtp();
 
     await this.posthogService.captureEvent(pendingOwner, "document_transfer", {
       documentId,
@@ -89,7 +134,7 @@ export class DocumentService {
     const user = await this.prisma.user.findUnique({
       where: { email: document.publisher },
     });
-    if(user) {
+    if (user) {
       await this.auditLogService.addAuditLog({
         eventType: "TRANSFER_OWNERSHIP",
         userID: user.id,
@@ -173,6 +218,9 @@ export class DocumentService {
     return `${sanitize(owner)}_${sanitize(dto.documentName)}_${timestamp}.pdf`;
   }
 
+  private readonly generateOtp = (): string =>
+    randomInt(0, 1_000_000).toString().padStart(6, "0");
+
   private getCurrentOwner(document) {
     const activeQrCodes = document.qrCode.slice(-2);
     const currentOwner = activeQrCodes.find((qr) => !qr.isPrivate)!.owner;
@@ -239,7 +287,7 @@ export class DocumentService {
 
     // Convert the map to an array sorted by generatedDate ascending.
     const ownershipHistory = Array.from(ownershipMap.values()).sort(
-      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime(),
+      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime()
     );
 
     const response: any = {

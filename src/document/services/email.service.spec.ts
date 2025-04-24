@@ -34,7 +34,7 @@ describe("EmailService", () => {
 
     emailService = new EmailService(
       configService as ConfigService,
-      documentRepo as DocumentRepository,
+      documentRepo as DocumentRepository
     );
   });
 
@@ -54,7 +54,7 @@ describe("EmailService", () => {
         ],
       };
       (documentRepo.findDocumentById as jest.Mock).mockResolvedValue(
-        fakeDocument,
+        fakeDocument
       );
 
       await emailService.sendOwnershipTransferEmail(
@@ -87,7 +87,7 @@ describe("EmailService", () => {
         ],
       };
       (documentRepo.findDocumentById as jest.Mock).mockResolvedValue(
-        fakeDocument,
+        fakeDocument
       );
       sendMailMock.mockRejectedValueOnce(new Error("Send failed"));
       await expect(
@@ -99,6 +99,37 @@ describe("EmailService", () => {
           documentId
         )
       ).rejects.toThrow("Send failed");
+    });
+  });
+
+  describe("sendPrivateAccessEmail", () => {
+    const email = "user@example.com";
+    const otp = "123456";
+    const documentName = "Confidential.pdf";
+
+    it("should send an email with correct content", async () => {
+      await emailService.sendPrivateAccessEmail(email, otp, documentName);
+
+      expect(sendMailMock).toHaveBeenCalledTimes(1);
+      const callArgs = sendMailMock.mock.calls[0][0];
+
+      // Verify the "from" field uses the GMAIL_USER
+      expect(callArgs.from).toBe(`"Avento Origin" <test@gmail.com>`);
+      expect(callArgs.to).toBe(email);
+      expect(callArgs.subject).toBe("Akses Dokumen Pribadi");
+
+      // Verify email HTML contains OTP and document name
+      expect(callArgs.html).toContain(`<code>${documentName}</code>`);
+      expect(callArgs.html).toContain(`<strong>${otp}</strong>`);
+      expect(callArgs.html).toContain("OTP ini berlaku selama 8 menit");
+    });
+
+    it("should propagate errors thrown by sendMail", async () => {
+      sendMailMock.mockRejectedValueOnce(new Error("SMTP failure"));
+
+      await expect(
+        emailService.sendPrivateAccessEmail(email, otp, documentName)
+      ).rejects.toThrow("SMTP failure");
     });
   });
 });

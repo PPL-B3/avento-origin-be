@@ -24,7 +24,10 @@ describe("DocumentService", () => {
       updateDocument: jest.fn(),
       changeOwnership: jest.fn(),
     } as any;
-    email = { sendOwnershipTransferEmail: jest.fn() } as any;
+    email = {
+      sendOwnershipTransferEmail: jest.fn(),
+      sendPrivateAccessEmail: jest.fn(),
+    } as any;
     config = { get: jest.fn() } as any;
     const posthog = { captureEvent: jest.fn() } as any;
     prisma = {
@@ -35,6 +38,10 @@ describe("DocumentService", () => {
       },
       qrCode: {
         findUnique: jest.fn(),
+      },
+      qrCodeOTP: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
       },
     } as any;
     auditLog = {
@@ -48,7 +55,7 @@ describe("DocumentService", () => {
       config,
       posthog,
       prisma,
-      auditLog,
+      auditLog
     );
   });
 
@@ -194,7 +201,7 @@ describe("DocumentService", () => {
 
       const result = await service.transferDocument(
         "doc-id",
-        "newowner@example.com",
+        "newowner@example.com"
       );
 
       expect(result.otp).toHaveLength(6);
@@ -205,7 +212,7 @@ describe("DocumentService", () => {
           otp: expect.any(String),
           otpExpiry: expect.any(Date),
           otpAttemptCount: 0,
-        }),
+        })
       );
 
       expect(email.sendOwnershipTransferEmail).toHaveBeenCalledWith(
@@ -213,7 +220,7 @@ describe("DocumentService", () => {
         "My Doc",
         "currentOwner",
         "Alice",
-        "doc-id",
+        "doc-id"
       );
 
       expect(auditLog.addAuditLog).toHaveBeenCalledWith({
@@ -279,7 +286,7 @@ describe("DocumentService", () => {
           otpExpiry: null,
           otpAttemptCount: 0,
         } as any,
-        prisma,
+        prisma
       );
       expect(result).toEqual({
         documentId: "new-document-id",
@@ -294,7 +301,7 @@ describe("DocumentService", () => {
         pendingOwner: null,
       });
       await expect(service.claimDocument("doc-id", "123456")).rejects.toThrow(
-        "No pending transfer.",
+        "No pending transfer."
       );
     });
 
@@ -304,7 +311,7 @@ describe("DocumentService", () => {
         otpExpiry: new Date(Date.now() - 1000),
       });
       await expect(service.claimDocument("doc-id", "123456")).rejects.toThrow(
-        "OTP expired.",
+        "OTP expired."
       );
     });
 
@@ -314,7 +321,7 @@ describe("DocumentService", () => {
         otpAttemptCount: 4,
       });
       await expect(service.claimDocument("doc-id", "123456")).rejects.toThrow(
-        "Too many failed attempts.",
+        "Too many failed attempts."
       );
     });
 
@@ -322,7 +329,7 @@ describe("DocumentService", () => {
       repo.findDocumentById.mockResolvedValue({ ...baseDoc, otp: "999999" });
       repo.updateDocument.mockResolvedValue({} as any);
       await expect(service.claimDocument("doc-id", "000000")).rejects.toThrow(
-        "Incorrect OTP.",
+        "Incorrect OTP."
       );
       expect(repo.updateDocument).toHaveBeenCalledWith("doc-id", {
         otpAttemptCount: { increment: 1 },
@@ -578,6 +585,128 @@ describe("DocumentService", () => {
       expect(result.filePath).toBeUndefined();
       expect(result.currentOwner).toEqual("Bob");
       expect(result.ownershipHistory).toHaveLength(2);
+    });
+  });
+
+  describe("requestQrCodeOTP", () => {
+    const qrId = "123e4567-e89b-12d3-a456-426614174000"; // valid uuid
+    const now = new Date();
+    const fakeQrCode = {
+      id: qrId,
+      owner: "owner@example.com",
+      isActive: true,
+      isPrivate: true,
+      document: {
+        documentName: "Test Document",
+      },
+    };
+
+    beforeEach(() => {
+      jest
+        .spyOn(Date, "now")
+        .mockReturnValue(new Date("2025-04-21T00:00:00Z").getTime());
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it("should create a new OTP and send email if no existing OTP", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.qrCodeOTP.create as jest.Mock).mockResolvedValue({
+        qrCodeId: qrId,
+        otp: "123456",
+        expiry: new Date(now.getTime() + 8 * 60 * 1000),
+        attemptCount: 0,
+        cooldown: now,
+      });
+
+      const result = await service.requestQrCodeOTP(qrId);
+
+      expect(prisma.qrCode.findUnique).toHaveBeenCalledWith({
+        where: { id: qrId },
+        include: { document: true },
+      });
+      expect(prisma.qrCodeOTP.create).toHaveBeenCalled();
+      expect(email.sendPrivateAccessEmail).toHaveBeenCalledWith(
+        fakeQrCode.owner,
+        expect.any(String),
+        fakeQrCode.document.documentName
+      );
+      expect(result).toEqual({
+        owner: fakeQrCode.owner,
+        document: fakeQrCode.document.documentName,
+      });
+    });
+
+    it("should throw if QR code is not found or inactive or public", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
+        "This QR code isn't for OTP requests."
+      );
+
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue({
+        ...fakeQrCode,
+        isActive: false,
+      });
+      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
+        "This QR code isn't for OTP requests."
+      );
+
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue({
+        ...fakeQrCode,
+        isPrivate: false,
+      });
+      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
+        "This QR code isn't for OTP requests."
+      );
+    });
+
+    it("should throw if existing OTP is expired", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue({
+        expiry: new Date(now.getTime() - 10000), // expired
+        cooldown: new Date(now.getTime() - 10000),
+      });
+
+      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
+        "OTP expired. Please request a new one."
+      );
+    });
+
+    it("should throw if existing OTP is still in cooldown", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue({
+        expiry: new Date(now.getTime() + 10000), // not expired
+        cooldown: new Date(now.getTime() + 10 * 60 * 1000), // still cooling down
+      });
+
+      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
+        /Retry in \d+ min\(s\)\./
+      );
+    });
+
+    it("should reuse existing valid OTP and send email", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
+      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue({
+        otp: "654321",
+        expiry: new Date(now.getTime() + 10 * 60 * 1000), // still valid
+        cooldown: new Date(now.getTime() - 10000), // cooldown already passed
+      });
+
+      const result = await service.requestQrCodeOTP(qrId);
+
+      expect(email.sendPrivateAccessEmail).toHaveBeenCalledWith(
+        fakeQrCode.owner,
+        expect.any(String),
+        fakeQrCode.document.documentName
+      );
+      expect(result).toEqual({
+        owner: fakeQrCode.owner,
+        document: fakeQrCode.document.documentName,
+      });
     });
   });
 });
