@@ -84,7 +84,4 @@ ALTER TABLE "qrcodes" ADD CONSTRAINT "qrcodes_documentId_fkey" FOREIGN KEY ("doc
 ALTER TABLE "qrcode_otps" ADD CONSTRAINT "qrcode_otps_qrCodeId_fkey" FOREIGN KEY ("qrCodeId") REFERENCES "qrcodes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_userID_fkey" FOREIGN KEY ("userID") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_documentID_fkey" FOREIGN KEY ("documentID") REFERENCES "Document"("documentID") ON DELETE SET NULL ON UPDATE CASCADE;
