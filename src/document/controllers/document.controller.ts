@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
@@ -20,6 +21,7 @@ import {
   ApiOperation,
   ApiResponse,
 } from "@nestjs/swagger";
+import { Request } from "supertest";
 
 @Controller("documents")
 export class DocumentController {
@@ -72,7 +74,8 @@ export class DocumentController {
   @ApiResponse({ status: 500, description: "Internal Server Error" })
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: UploadDocumentDTO
+    @Req() request: Request,
+    @Body() body: UploadDocumentDTO,
   ) {
     if (!file) {
       throw new BadRequestException("No file uploaded.");
@@ -84,7 +87,11 @@ export class DocumentController {
       throw new BadRequestException("File size exceeds 8MB limit.");
     }
 
-    return await this.docService.uploadDocument(file, body);
+    return await this.docService.uploadDocument(
+      file,
+      body,
+      request["user"].userId,
+    );
   }
 
   @Post("transfer")

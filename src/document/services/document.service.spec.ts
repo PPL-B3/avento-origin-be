@@ -31,6 +31,7 @@ describe("DocumentService", () => {
       $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
       user: {
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
       },
       qrCode: {
         findUnique: jest.fn(),
@@ -61,18 +62,23 @@ describe("DocumentService", () => {
         documentId: "new-document-id",
       });
 
+      (prisma.user.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        id: "user-id-123",
+        email: "alice@example.com",
+      });
+
       const file = {
         buffer: Buffer.from("pdf"),
         mimetype: "application/pdf",
       } as any;
-      const dto = { documentName: "My Doc", ownerName: "Alice" };
+      const dto = { documentName: "My Doc" };
 
-      const result = await service.uploadDocument(file, dto);
+      const result = await service.uploadDocument(file, dto, "user-id-123");
       expect(s3Storage.uploadPDF).toHaveBeenCalledWith(
         file.buffer,
         file.mimetype,
         "bucket-name",
-        expect.stringMatching(/^Alice_My-Doc_\d+\.pdf$/),
+        expect.stringMatching(/^alice@example\.com_My-Doc_\d+\.pdf$/),
       );
       expect(repo.createDocument).toHaveBeenCalled();
       expect(result).toEqual({
@@ -84,10 +90,13 @@ describe("DocumentService", () => {
     it("throws if bucket is not configured", async () => {
       config.get.mockReturnValue(undefined);
       await expect(
-        service.uploadDocument({} as any, {
-          documentName: "x",
-          ownerName: "y",
-        }),
+        service.uploadDocument(
+          {} as any,
+          {
+            documentName: "x",
+          },
+          "user-id-123",
+        ),
       ).rejects.toThrow("DO_SPACES_BUCKET is not configured");
     });
 
@@ -99,17 +108,18 @@ describe("DocumentService", () => {
         publicId: "new-qr-public",
         documentId: "new-document-id",
       });
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      (prisma.user.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         id: "user-id-123",
+        email: "alice@example.com",
       });
 
       const file = {
         buffer: Buffer.from("pdf"),
         mimetype: "application/pdf",
       } as any;
-      const dto = { documentName: "Audit Doc", ownerName: "alice@example.com" };
+      const dto = { documentName: "Audit Doc" };
 
-      await service.uploadDocument(file, dto);
+      await service.uploadDocument(file, dto, "user-id-123");
 
       expect(auditLog.addAuditLog).toHaveBeenCalledWith({
         eventType: "UPLOAD_DOCUMENT",
@@ -127,16 +137,16 @@ describe("DocumentService", () => {
         publicId: "new-qr-public",
         documentId: "new-document-id",
       });
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null); // simulate user not found
+      (prisma.user.findUniqueOrThrow as jest.Mock).mockRejectedValue(new Error("Not Found"));
 
       const file = {
         buffer: Buffer.from("pdf"),
         mimetype: "application/pdf",
       } as any;
-      const dto = { documentName: "No Audit", ownerName: "ghost@example.com" };
-
-      await service.uploadDocument(file, dto);
-
+      const dto = { documentName: "No Audit" };
+      await expect(
+        service.uploadDocument(file, dto, "ghost-user"),
+      ).rejects.toThrow();
       expect(auditLog.addAuditLog).not.toHaveBeenCalled();
     });
   });
@@ -333,8 +343,8 @@ describe("DocumentService", () => {
     });
 
     it("generateFilename sanitizes names and formats correctly", () => {
-      const dto = { ownerName: "John Doe", documentName: "My Doc" };
-      const result = (service as any).generateFilename(dto, 123456);
+      const dto = { documentName: "My Doc" };
+      const result = (service as any).generateFilename(dto, 123456, "John Doe");
       expect(result).toBe("John-Doe_My-Doc_123456.pdf");
     });
   });
