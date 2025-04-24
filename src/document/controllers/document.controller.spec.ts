@@ -2,8 +2,23 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { DocumentController } from "./document.controller";
 import { DocumentService } from "../services/document.service";
 import * as request from "supertest";
-import { INestApplication, NotFoundException } from "@nestjs/common";
+import {
+  CanActivate,
+  ExecutionContext,
+  INestApplication,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { MulterModule } from "@nestjs/platform-express";
+
+@Injectable()
+class MockAuthGuard implements CanActivate {
+  canActivate(context: ExecutionContext) {
+    const req = context.switchToHttp().getRequest();
+    req.user = { userId: "test-user" };
+    return true;
+  }
+}
 
 describe("DocumentController", () => {
   let app: INestApplication;
@@ -26,6 +41,7 @@ describe("DocumentController", () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    app.useGlobalGuards(new MockAuthGuard());
     await app.init();
 
     controller = moduleRef.get<DocumentController>(DocumentController);
@@ -36,23 +52,34 @@ describe("DocumentController", () => {
   afterAll(async () => await app.close());
 
   describe("/documents/upload (POST)", () => {
+    const jwtToken = "Bearer mocked-jwt-token";
+
     it("should upload a valid PDF file under 8MB", async () => {
-      mockDocService.uploadDocument.mockResolvedValue({ success: true });
+      mockDocService.uploadDocument.mockResolvedValue({
+        privateId: "p",
+        publicId: "q",
+      });
 
       const res = await request(app.getHttpServer())
         .post("/documents/upload")
+        .set("Authorization", jwtToken)
         .attach("file", Buffer.from("%PDF-1.4"), "document.pdf")
-        .field("title", "My Doc")
+        .field("documentName", "My Doc")
         .set("Content-Type", "multipart/form-data");
 
       expect(res.status).toBe(201);
-      expect(docService.uploadDocument).toHaveBeenCalled();
+      expect(docService.uploadDocument).toHaveBeenCalledWith(
+        expect.any(Object),
+        { documentName: "My Doc" },
+        "test-user"
+      );
     });
 
     it("should reject when no file is uploaded", async () => {
       const res = await request(app.getHttpServer())
         .post("/documents/upload")
-        .field("title", "No File");
+        .set("Authorization", jwtToken)
+        .field("documentName", "No File");
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe("No file uploaded.");
@@ -61,8 +88,9 @@ describe("DocumentController", () => {
     it("should reject non-PDF files", async () => {
       const res = await request(app.getHttpServer())
         .post("/documents/upload")
+        .set("Authorization", jwtToken)
         .attach("file", Buffer.from("not-a-pdf"), "image.jpg")
-        .field("title", "Wrong File");
+        .field("documentName", "Wrong File");
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe("Invalid file type.");
@@ -73,8 +101,9 @@ describe("DocumentController", () => {
 
       const res = await request(app.getHttpServer())
         .post("/documents/upload")
+        .set("Authorization", jwtToken)
         .attach("file", bigBuffer, "big.pdf")
-        .field("title", "Too Big");
+        .field("documentName", "Too Big");
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe("File size exceeds 8MB limit.");

@@ -1,5 +1,7 @@
 import axios from "axios";
 import { PostHogService } from "./posthog.service";
+import { Test, TestingModule } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
 
 jest.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -7,11 +9,26 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 describe("PostHogService", () => {
   let service: PostHogService;
   const apiUrl = "https://app.posthog.com/capture";
-  const apiKey = "phc_y5HJD0i3FYXaowP2gRA8RlRSWS7f6THPk6pG8oIV39J";
+  const apiKey = "skibiditoilet";
 
-  beforeEach(() => {
-    service = new PostHogService();
+  beforeEach(async () => {
     jest.clearAllMocks();
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PostHogService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === "POSTHOG_APIKEY") {
+                return apiKey;
+              }
+            }),
+          },
+        },
+      ],
+    }).compile();
+    service = module.get<PostHogService>(PostHogService);
   });
 
   it("should call axios.post with correct parameters", async () => {

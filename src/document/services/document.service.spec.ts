@@ -34,6 +34,7 @@ describe("DocumentService", () => {
       $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
       user: {
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
       },
       qrCode: {
         findUnique: jest.fn(),
@@ -68,18 +69,23 @@ describe("DocumentService", () => {
         documentId: "new-document-id",
       });
 
+      (prisma.user.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        id: "user-id-123",
+        email: "alice@example.com",
+      });
+
       const file = {
         buffer: Buffer.from("pdf"),
         mimetype: "application/pdf",
       } as any;
-      const dto = { documentName: "My Doc", ownerName: "Alice" };
+      const dto = { documentName: "My Doc" };
 
-      const result = await service.uploadDocument(file, dto);
+      const result = await service.uploadDocument(file, dto, "user-id-123");
       expect(s3Storage.uploadPDF).toHaveBeenCalledWith(
         file.buffer,
         file.mimetype,
         "bucket-name",
-        expect.stringMatching(/^Alice_My-Doc_\d+\.pdf$/)
+        expect.stringMatching(/^alice@example\.com_My-Doc_\d+\.pdf$/),
       );
       expect(repo.createDocument).toHaveBeenCalled();
       expect(result).toEqual({
@@ -91,10 +97,13 @@ describe("DocumentService", () => {
     it("throws if bucket is not configured", async () => {
       config.get.mockReturnValue(undefined);
       await expect(
-        service.uploadDocument({} as any, {
-          documentName: "x",
-          ownerName: "y",
-        })
+        service.uploadDocument(
+          {} as any,
+          {
+            documentName: "x",
+          },
+          "user-id-123",
+        ),
       ).rejects.toThrow("DO_SPACES_BUCKET is not configured");
     });
 
@@ -106,17 +115,18 @@ describe("DocumentService", () => {
         publicId: "new-qr-public",
         documentId: "new-document-id",
       });
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      (prisma.user.findUniqueOrThrow as jest.Mock).mockResolvedValue({
         id: "user-id-123",
+        email: "alice@example.com",
       });
 
       const file = {
         buffer: Buffer.from("pdf"),
         mimetype: "application/pdf",
       } as any;
-      const dto = { documentName: "Audit Doc", ownerName: "alice@example.com" };
+      const dto = { documentName: "Audit Doc" };
 
-      await service.uploadDocument(file, dto);
+      await service.uploadDocument(file, dto, "user-id-123");
 
       expect(auditLog.addAuditLog).toHaveBeenCalledWith({
         eventType: "UPLOAD_DOCUMENT",
@@ -134,16 +144,16 @@ describe("DocumentService", () => {
         publicId: "new-qr-public",
         documentId: "new-document-id",
       });
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null); // simulate user not found
+      (prisma.user.findUniqueOrThrow as jest.Mock).mockRejectedValue(new Error("Not Found"));
 
       const file = {
         buffer: Buffer.from("pdf"),
         mimetype: "application/pdf",
       } as any;
-      const dto = { documentName: "No Audit", ownerName: "ghost@example.com" };
-
-      await service.uploadDocument(file, dto);
-
+      const dto = { documentName: "No Audit" };
+      await expect(
+        service.uploadDocument(file, dto, "ghost-user"),
+      ).rejects.toThrow();
       expect(auditLog.addAuditLog).not.toHaveBeenCalled();
     });
   });
@@ -340,8 +350,8 @@ describe("DocumentService", () => {
     });
 
     it("generateFilename sanitizes names and formats correctly", () => {
-      const dto = { ownerName: "John Doe", documentName: "My Doc" };
-      const result = (service as any).generateFilename(dto, 123456);
+      const dto = { documentName: "My Doc" };
+      const result = (service as any).generateFilename(dto, 123456, "John Doe");
       expect(result).toBe("John-Doe_My-Doc_123456.pdf");
     });
   });
@@ -350,52 +360,31 @@ describe("DocumentService", () => {
     it("should throw NotFoundException if QR code is not found", async () => {
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
       await expect(service.viewDocument("non-existent-id")).rejects.toThrow(
-        new NotFoundException("QR code not found")
+        new NotFoundException("QR code not found"),
       );
     });
 
-    it("should throw NotFoundException if no active QR codes are found", async () => {
-      const fakeDocument = {
-        documentID: "doc123",
-        documentName: "Test Doc",
-        uploadDate: new Date("2025-04-05T12:00:00Z"),
-        publisher: "Test Publisher",
-        filePath: "/path/to/file",
-        // All QR codes are inactive.
-        qrCode: [
-          {
-            id: "qr1",
-            owner: "Alice",
-            isActive: false,
-            isPrivate: true,
-            generatedDate: new Date("2025-04-05T10:00:00Z"),
-            documentId: "doc123",
-          },
-          {
-            id: "qr2",
-            owner: "Alice",
-            isActive: false,
-            isPrivate: false,
-            generatedDate: new Date("2025-04-05T10:00:00Z"),
-            documentId: "doc123",
-          },
-        ],
-      };
-
-      const fakeQrCode = {
-        id: "qr1",
-        owner: "Alice",
+    it("should throw BadRequestException when QR code is not active", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue({
+        id: "qr-inactive",
         isActive: false,
-        isPrivate: true,
-        generatedDate: new Date("2025-04-05T10:00:00Z"),
-        documentId: "doc123",
-        document: fakeDocument,
-      };
+      } as any);
 
-      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
-      await expect(service.viewDocument("qr1")).rejects.toThrow(
-        new NotFoundException("No active QR code found for this document")
+      await expect(service.viewDocument("qr-inactive")).rejects.toThrow(
+        new BadRequestException("QR code exists but is inactive"),
       );
+      expect(prisma.qrCode.findUnique).toHaveBeenCalledWith({
+        where: { id: "qr-inactive" },
+        include: {
+          document: {
+            include: {
+              qrCode: {
+                orderBy: { generatedDate: "asc" },
+              },
+            },
+          },
+        },
+      });
     });
 
     it("should throw error if more than 2 active QR codes are found", async () => {

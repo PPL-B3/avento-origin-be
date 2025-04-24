@@ -4,7 +4,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
 export class DocumentRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async createDocument(data: Prisma.DocumentCreateInput) {
     return this.prisma.$transaction(async (transaction) => {

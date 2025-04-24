@@ -29,8 +29,6 @@ model User {
   role       String
   lastLogout BigInt
 
-  auditLogs AuditLog[]
-
   @@map("users")
 }
 
@@ -83,7 +81,6 @@ model AuditLog {
   logID      String    @id @default(uuid())
   eventType  String
   timestamp  DateTime  @default(now())
-  user       User      @relation(fields: [userID], references: [id])
   userID     String
   document   Document? @relation(fields: [documentID], references: [documentID])
   documentID String?

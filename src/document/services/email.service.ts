@@ -5,7 +5,7 @@ import { DocumentRepository } from "../repositories/document.repository";
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private readonly transporter: nodemailer.Transporter;
 
   constructor(
     private readonly configService: ConfigService,
