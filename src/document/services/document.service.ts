@@ -87,7 +87,7 @@ export class DocumentService {
 
     const otp = this.generateOtp();
     if (!qrOTP) {
-      qrOTP = await this.prisma.qrCodeOTP.create({
+      await this.prisma.qrCodeOTP.create({
         data: {
           qrCodeId: qrId,
           otp,
@@ -218,7 +218,7 @@ export class DocumentService {
     return `${sanitize(owner)}_${sanitize(dto.documentName)}_${timestamp}.pdf`;
   }
 
-  private generateOtp = (): string =>
+  private readonly generateOtp = (): string =>
     randomInt(0, 1_000_000).toString().padStart(6, "0");
 
   private getCurrentOwner(document) {
