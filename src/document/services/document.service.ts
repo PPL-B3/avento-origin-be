@@ -207,7 +207,7 @@ export class DocumentService {
       throw new NotFoundException("QR code not found");
     }
     if (!qrCode.isActive) {
-      throw new BadRequestException("QR code exits but is inactive");
+      throw new BadRequestException("QR code exists but is inactive");
     }
 
     const document = qrCode.document;
