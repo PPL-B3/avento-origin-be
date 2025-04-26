@@ -28,7 +28,7 @@ export class DocumentService {
   async uploadDocument(
     pdf: Express.Multer.File,
     dto: UploadDocumentDTO,
-    userId: string,
+    userId: string
   ) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: {
@@ -48,7 +48,7 @@ export class DocumentService {
       pdf.buffer,
       pdf.mimetype,
       bucketName,
-      filename,
+      filename
     );
 
     const createdDocument = await this.documentRepo.createDocument({
@@ -86,25 +86,30 @@ export class DocumentService {
     });
 
     const otp = this.generateOtp();
+    const now = new Date(Date.now());
+    const expiry = new Date(now.getTime() + 8 * 60 * 1000); // 8 minutes.
+
     if (!qrOTP) {
-      await this.prisma.qrCodeOTP.create({
+      qrOTP = await this.prisma.qrCodeOTP.create({
         data: {
           qrCodeId: qrId,
-          otp,
-          expiry: new Date(Date.now() + 8 * 60 * 1000), // 8 min.
+          otp: otp,
+          expiry: expiry,
           attemptCount: 0,
-          cooldown: new Date(Date.now()),
+          cooldown: now,
         },
       });
     } else {
-      const now = new Date();
-      if (now > qrOTP.expiry) {
-        throw new BadRequestException("OTP expired. Please request a new one.");
-      }
       if (now < qrOTP.cooldown) {
-        const remainingMs = qrOTP.cooldown.getTime() - now.getTime();
-        const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
-        throw new BadRequestException(`Retry in ${remainingMinutes} min(s).`);
+        throw new BadRequestException(this.getRetryText(qrOTP.cooldown, now));
+      } else {
+        await this.prisma.qrCodeOTP.update({
+          where: { qrCodeId: qrId },
+          data: {
+            otp: otp,
+            expiry: expiry,
+          },
+        });
       }
     }
 
@@ -114,6 +119,42 @@ export class DocumentService {
       qrCode.document.documentName
     );
     return { owner: qrCode.owner, document: qrCode.document.documentName };
+  }
+
+  async validateQrCodeOTP(qrId: string, otp: string) {
+    const { success, qrCode } = await this.prisma.$transaction(async (tx) => {
+      const qrOTP = await tx.qrCodeOTP.findUniqueOrThrow({
+        where: { qrCodeId: qrId },
+        include: { qrCode: true },
+      });
+
+      const now = new Date();
+      if (now < qrOTP.cooldown)
+        throw new BadRequestException(this.getRetryText(qrOTP.cooldown, now));
+      if (now > qrOTP.expiry)
+        throw new BadRequestException("OTP expired. Please request a new one.");
+
+      const isValid = qrOTP.otp.toLowerCase() === otp.toLowerCase();
+      const updateData = isValid
+        ? { attemptCount: 0, expiry: now }
+        : {
+            attemptCount: qrOTP.attemptCount + 1,
+            ...(qrOTP.attemptCount + 1 >= 4 && {
+              attemptCount: 0,
+              cooldown: new Date(now.getTime() + 60 * 60 * 1000),
+            }),
+          };
+
+      await tx.qrCodeOTP.update({
+        where: { qrCodeId: qrId },
+        data: updateData,
+      });
+
+      return { success: isValid, qrCode: qrOTP.qrCode };
+    });
+
+    if (!success) throw new BadRequestException("Invalid OTP.");
+    return qrCode;
   }
 
   async transferDocument(documentId: string, pendingOwner: string) {
@@ -148,7 +189,7 @@ export class DocumentService {
       document.documentName,
       this.getCurrentOwner(document),
       document.publisher,
-      documentId,
+      documentId
     );
 
     return { otp: otp };
@@ -212,7 +253,7 @@ export class DocumentService {
   private generateFilename(
     dto: UploadDocumentDTO,
     timestamp: number,
-    owner: string,
+    owner: string
   ): string {
     const sanitize = (str: string) => str.replace(/\s+/g, "-");
     return `${sanitize(owner)}_${sanitize(dto.documentName)}_${timestamp}.pdf`;
@@ -220,6 +261,12 @@ export class DocumentService {
 
   private readonly generateOtp = (): string =>
     randomInt(0, 1_000_000).toString().padStart(6, "0");
+
+  private getRetryText(cooldown: Date, now: Date): string {
+    const remainingMs = cooldown.getTime() - now.getTime();
+    const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+    return `Retry in ${remainingMinutes} minute(s).`;
+  }
 
   private getCurrentOwner(document) {
     const activeQrCodes = document.qrCode.slice(-2);
