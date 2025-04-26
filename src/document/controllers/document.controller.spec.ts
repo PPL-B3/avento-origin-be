@@ -8,8 +8,11 @@ import {
   INestApplication,
   Injectable,
   NotFoundException,
+  ValidationPipe,
 } from "@nestjs/common";
 import { MulterModule } from "@nestjs/platform-express";
+import * as path from "path";
+import * as fs from "fs";
 
 @Injectable()
 class MockAuthGuard implements CanActivate {
@@ -26,13 +29,23 @@ describe("DocumentController", () => {
   let controller: DocumentController;
 
   const mockDocService = {
-    uploadDocument: jest.fn(),
+    uploadDocument: jest.fn().mockResolvedValue({
+      privateId: "dummy-private-id",
+      publicId: "dummy-public-id",
+    }),
     requestQrCodeOTP: jest.fn(),
     transferDocument: jest.fn(),
     claimDocument: jest.fn(),
     viewDocument: jest.fn(),
+    validateQrCodeOTP: jest.fn(),
   };
 
+  // beforeEach(() => {
+  //   jest.spyOn(docService, "uploadDocument").mockResolvedValue({
+  //     privateId: "dummy-private-id",
+  //     publicId: "dummy-public-id",
+  //   });
+  // });
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [MulterModule.register({})],
@@ -42,6 +55,13 @@ describe("DocumentController", () => {
 
     app = moduleRef.createNestApplication();
     app.useGlobalGuards(new MockAuthGuard());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      })
+    );
     await app.init();
 
     controller = moduleRef.get<DocumentController>(DocumentController);
@@ -55,21 +75,28 @@ describe("DocumentController", () => {
     const jwtToken = "Bearer mocked-jwt-token";
 
     it("should upload a valid PDF file under 8MB", async () => {
-      mockDocService.uploadDocument.mockResolvedValue({
-        privateId: "p",
-        publicId: "q",
-      });
+      const pathToDummyPDF = path.resolve(
+        process.cwd(),
+        "src",
+        "document",
+        "dummy.pdf"
+      );
+
+      console.log("pathToDummyPDF:", pathToDummyPDF);
+      console.log("File exists?", fs.existsSync(pathToDummyPDF));
 
       const res = await request(app.getHttpServer())
         .post("/documents/upload")
-        .set("Authorization", jwtToken)
-        .attach("file", Buffer.from("%PDF-1.4"), "document.pdf")
-        .field("documentName", "My Doc")
-        .set("Content-Type", "multipart/form-data");
+        .attach("file", pathToDummyPDF)
+        .field("documentName", "My Doc");
 
       expect(res.status).toBe(201);
       expect(docService.uploadDocument).toHaveBeenCalledWith(
-        expect.any(Object),
+        expect.objectContaining({
+          fieldname: "file",
+          originalname: "dummy.pdf",
+          mimetype: "application/pdf",
+        }),
         { documentName: "My Doc" },
         "test-user"
       );
@@ -238,6 +265,40 @@ describe("DocumentController", () => {
 
       expect(res.status).toBe(404);
       expect(res.body.message).toBe("QR Code not found");
+    });
+  });
+
+  describe("/documents/access (POST)", () => {
+    it("should validate OTP successfully", async () => {
+      mockDocService.validateQrCodeOTP = jest
+        .fn()
+        .mockResolvedValue({ valid: true });
+
+      const res = await request(app.getHttpServer())
+        .post("/documents/access")
+        .send({ qrId: "123e4567-e89b-12d3-a456-426614174000", otp: "654321" });
+
+      expect(res.status).toBe(201);
+      expect(res.body).toEqual({ valid: true });
+      expect(docService.validateQrCodeOTP).toHaveBeenCalledWith(
+        "123e4567-e89b-12d3-a456-426614174000",
+        "654321"
+      );
+    });
+
+    it("should return 400 if fields are missing", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/documents/access")
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(Array.isArray(res.body.message)).toBe(true);
+      expect(res.body.message).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("qrId should not be empty"),
+          expect.stringContaining("otp should not be empty"),
+        ])
+      );
     });
   });
 });
