@@ -90,7 +90,7 @@ export class DocumentService {
     const expiry = new Date(now.getTime() + 8 * 60 * 1000); // 8 minutes.
 
     if (!qrOTP) {
-      qrOTP = await this.prisma.qrCodeOTP.create({
+      await this.prisma.qrCodeOTP.create({
         data: {
           qrCodeId: qrId,
           otp: otp,
@@ -99,18 +99,13 @@ export class DocumentService {
           cooldown: now,
         },
       });
+    } else if (now < qrOTP.cooldown) {
+      throw new BadRequestException(this.getRetryText(qrOTP.cooldown, now));
     } else {
-      if (now < qrOTP.cooldown) {
-        throw new BadRequestException(this.getRetryText(qrOTP.cooldown, now));
-      } else {
-        await this.prisma.qrCodeOTP.update({
-          where: { qrCodeId: qrId },
-          data: {
-            otp: otp,
-            expiry: expiry,
-          },
-        });
-      }
+      await this.prisma.qrCodeOTP.update({
+        where: { qrCodeId: qrId },
+        data: { otp: otp, expiry: expiry },
+      });
     }
 
     await this.emailService.sendPrivateAccessEmail(
