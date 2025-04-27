@@ -10,6 +10,7 @@ CREATE TABLE "messages" (
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "role" TEXT NOT NULL,
@@ -73,6 +74,9 @@ CREATE TABLE "audit_logs" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE INDEX "users_createdAt_idx" ON "users"("createdAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "qrcode_otps_qrCodeId_key" ON "qrcode_otps"("qrCodeId");

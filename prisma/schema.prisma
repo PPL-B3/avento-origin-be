@@ -24,12 +24,14 @@ model Message {
 
 model User {
   id         String @id @default(uuid())
+  createdAt  DateTime @default(now())
   email      String @unique
   password   String
   role       String
   lastLogout BigInt
 
   @@map("users")
+  @@index([createdAt])
 }
 
 model Document {
