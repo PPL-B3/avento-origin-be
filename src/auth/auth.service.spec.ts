@@ -100,7 +100,7 @@ describe("AuthService", () => {
 
     it("should throw BadRequestException if userId is missing", async () => {
       await expect(authService.logout("")).rejects.toThrow(
-        "User ID harus diisi",
+        "User ID harus diisi"
       );
     });
 
@@ -136,6 +136,7 @@ describe("AuthService", () => {
       password: "hashedpassword",
       role: "user",
       lastLogout: BigInt(Date.now()),
+      createdAt: new Date(),
     };
 
     jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
@@ -171,12 +172,12 @@ describe("AuthService", () => {
       new PrismaClientKnownRequestError("", {
         code: "P2002",
         clientVersion: "6.4.1",
-      }),
+      })
     );
 
     await expect(authService.register(dto)).rejects.toThrow(ForbiddenException);
     await expect(authService.register(dto)).rejects.toThrow(
-      "Email has already been registered",
+      "Email has already been registered"
     );
 
     expect(argon.hash).toHaveBeenCalledWith(dto.password);
@@ -196,7 +197,7 @@ describe("AuthService", () => {
 
     await expect(authService.register(dto)).rejects.toThrow(Error);
     await expect(authService.register(dto)).rejects.toThrow(
-      "Unexpected database error",
+      "Unexpected database error"
     );
 
     expect(argon.hash).toHaveBeenCalledWith(dto.password);
@@ -215,6 +216,7 @@ describe("AuthService", () => {
       password: "hashedpassword",
       role: "user",
       lastLogout: BigInt(Date.now()),
+      createdAt: new Date(),
     };
 
     jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
@@ -246,7 +248,7 @@ describe("AuthService", () => {
 
     await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
     await expect(authService.login(dto)).rejects.toThrow(
-      "Username or password is incorrect",
+      "Username or password is incorrect"
     );
 
     expect(prismaService.user.findUnique).toHaveBeenCalledWith({
@@ -266,6 +268,7 @@ describe("AuthService", () => {
       password: "hashedpassword",
       role: "user",
       lastLogout: BigInt(Date.now()),
+      createdAt: new Date(),
     };
 
     jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
@@ -273,7 +276,7 @@ describe("AuthService", () => {
 
     await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
     await expect(authService.login(dto)).rejects.toThrow(
-      "Username or password is incorrect",
+      "Username or password is incorrect"
     );
 
     expect(prismaService.user.findUnique).toHaveBeenCalledWith({
@@ -307,6 +310,7 @@ describe("AuthService", () => {
       password: string;
       role: string;
       lastLogout: bigint;
+      createdAt: Date;
     };
 
     beforeEach(() => {
@@ -316,6 +320,7 @@ describe("AuthService", () => {
         password: "hashedpassword",
         role: "user",
         lastLogout: BigInt(0),
+        createdAt: new Date(),
       };
     });
 
@@ -335,35 +340,35 @@ describe("AuthService", () => {
     it("should fail if password is too short", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "A1!a" };
       await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException,
+        BadRequestException
       );
     });
 
     it("should fail if password lacks a lowercase letter", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "VALID1!A" };
       await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException,
+        BadRequestException
       );
     });
 
     it("should fail if password lacks an uppercase letter", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "valid1!a" };
       await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException,
+        BadRequestException
       );
     });
 
     it("should fail if password lacks a number", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "Valid!Aa" };
       await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException,
+        BadRequestException
       );
     });
 
     it("should fail if password lacks a special character", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "Valid1Aa" };
       await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException,
+        BadRequestException
       );
     });
     it("should still return success even if audit log fails", async () => {
