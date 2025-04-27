@@ -348,4 +348,31 @@ export class DocumentService {
 
     return response;
   }
+
+  async reverseOwnership(documentId: string, index: number) {
+    return await this.prisma.$transaction(async (tx) => {
+      const document = await this.documentRepo.findDocumentById(documentId, tx);
+      const qrCodes = document.qrCode;
+
+      if ((index + 1) * 2 > qrCodes.length)
+        throw new BadRequestException("Index out of range.");
+
+      const prevOwner = qrCodes[index * 2].owner;
+      const activeOwner = qrCodes[qrCodes.length - 2].owner;
+
+      await this.documentRepo.changeOwnership(tx, prevOwner, documentId);
+
+      const admin = await this.prisma.user.findFirst({
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+
+      await this.auditLogService.addAuditLog({
+        eventType: "REVERSE_OWNERSHIP",
+        userID: admin!.id,
+        details: `Ownership reversed from ${activeOwner} to ${prevOwner}.`,
+        documentID: documentId,
+      });
+    });
+  }
 }
