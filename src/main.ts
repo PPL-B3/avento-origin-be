@@ -21,11 +21,12 @@ async function bootstrap() {
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
+      whitelist: true, // strips properties not in DTO.
+      forbidNonWhitelisted: true, // throws error if extra fields are sent.
+      transform: true, // auto-transform payloads to DTO classes.
     })
   );
   app.enableCors();
-  app.useGlobalPipes(new ValidationPipe());
 
   const configService = app.get(ConfigService);
 
@@ -39,7 +40,7 @@ async function bootstrap() {
   SwaggerModule.setup(
     configService.get<string>("API_ENDPOINT", "api-default"),
     app,
-    documentFactory
+    documentFactory,
   );
 
   await app.listen(process.env.PORT ?? 4000);

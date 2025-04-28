@@ -4,6 +4,7 @@ import { AuthService } from "./auth.service";
 import { AuthDto } from "./dto";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ForbiddenException } from "@nestjs/common";
+import { Role } from "@prisma/client";
 
 describe("AuthController", () => {
   let authController: AuthController;
@@ -50,7 +51,7 @@ describe("AuthController", () => {
     const mockResponse = {
       id: "123",
       email: dto.email,
-      role: "user",
+      role: Role.USER,
     };
 
     jest.spyOn(authService, "register").mockResolvedValue(mockResponse);
@@ -97,7 +98,7 @@ describe("AuthController", () => {
       user: {
         id: "123",
         email: dto.email,
-        role: "user",
+        role: Role.USER,
       },
     };
 

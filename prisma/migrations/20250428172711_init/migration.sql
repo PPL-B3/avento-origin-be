@@ -1,3 +1,6 @@
+-- CreateEnum
+CREATE TYPE "Role" AS ENUM ('USER', 'ADMIN');
+
 -- CreateTable
 CREATE TABLE "messages" (
     "id" SERIAL NOT NULL,
@@ -10,9 +13,10 @@ CREATE TABLE "messages" (
 -- CreateTable
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
-    "role" TEXT NOT NULL,
+    "role" "Role" NOT NULL DEFAULT 'USER',
     "lastLogout" BIGINT NOT NULL,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
@@ -46,6 +50,20 @@ CREATE TABLE "qrcodes" (
 );
 
 -- CreateTable
+CREATE TABLE "qrcode_otps" (
+    "id" TEXT NOT NULL,
+    "qrCodeId" TEXT NOT NULL,
+    "otp" TEXT NOT NULL,
+    "expiry" TIMESTAMP(3) NOT NULL,
+    "attemptCount" INTEGER NOT NULL DEFAULT 0,
+    "cooldown" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "qrcode_otps_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "audit_logs" (
     "logID" TEXT NOT NULL,
     "eventType" TEXT NOT NULL,
@@ -60,8 +78,17 @@ CREATE TABLE "audit_logs" (
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
+-- CreateIndex
+CREATE INDEX "users_createdAt_idx" ON "users"("createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "qrcode_otps_qrCodeId_key" ON "qrcode_otps"("qrCodeId");
+
 -- AddForeignKey
 ALTER TABLE "qrcodes" ADD CONSTRAINT "qrcodes_documentId_fkey" FOREIGN KEY ("documentId") REFERENCES "Document"("documentID") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "qrcode_otps" ADD CONSTRAINT "qrcode_otps_qrCodeId_fkey" FOREIGN KEY ("qrCodeId") REFERENCES "qrcodes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_documentID_fkey" FOREIGN KEY ("documentID") REFERENCES "Document"("documentID") ON DELETE SET NULL ON UPDATE CASCADE;

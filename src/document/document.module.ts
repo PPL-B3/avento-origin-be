@@ -9,6 +9,7 @@ import { PostHogModule } from "../posthog/posthog.module";
 import { PrismaService } from "../prisma/prisma.service";
 import { ConfigService } from "@nestjs/config";
 import { AuditLogModule } from "../auditLog/auditLog.module";
+import { JwtService } from "../auth/jwt/jwt.service";
 
 @Module({
   imports: [PostHogModule, AuditLogModule],
@@ -20,6 +21,7 @@ import { AuditLogModule } from "../auditLog/auditLog.module";
     DocumentRepository,
     PrismaService,
     ConfigService,
+    JwtService,
   ],
 })
 export class DocumentsModule {}
