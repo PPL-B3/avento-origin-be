@@ -72,6 +72,8 @@ jobs:
             GMAIL_USER=${{ secrets.GMAIL_USER }}
             GMAIL_PASS=${{ secrets.GMAIL_PASS }}
             FE_URL=${{ secrets.FE_URL }}
+            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           EOF
       
       - name: Set up ssh key
