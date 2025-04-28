@@ -37,11 +37,13 @@ import { AdminSeederService } from "./auth/adminseeder.service";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(JwtAuthMiddleware)
-      .forRoutes(
-        { path: "documents/upload", method: RequestMethod.ALL },
-        { path: "audit-log", method: RequestMethod.ALL },
-      );
+    consumer.apply(JwtAuthMiddleware).forRoutes(
+      { path: "documents/upload", method: RequestMethod.ALL },
+      {
+        path: "documents/get-document/:documentId",
+        method: RequestMethod.ALL,
+      },
+      { path: "audit-log", method: RequestMethod.ALL },
+    );
   }
 }
