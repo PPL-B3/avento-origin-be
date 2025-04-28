@@ -1,578 +1,638 @@
-import { AuditLogService, AuditLogFilter } from "./auditLog.service";
+import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
+import { DeepMockProxy, mockDeep } from "jest-mock-extended";
+import { PrismaClient } from "@prisma/client";
+import { AuditLogService } from "./auditLog.service";
 
 describe("AuditLogService", () => {
-  let auditLogService: AuditLogService;
-  let mockPrisma: any;
+  let service: AuditLogService;
+  let prismaService: DeepMockProxy<PrismaClient>;
 
-  beforeEach(() => {
-    mockPrisma = {
-      auditLog: {
-        create: jest.fn(),
-        findMany: jest.fn(),
-        count: jest.fn(),
-      },
-    };
+  beforeEach(async () => {
+    const prismaServiceMock = mockDeep<PrismaClient>();
 
-    const mockPrismaService = mockPrisma as unknown as PrismaService;
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuditLogService,
+        {
+          provide: PrismaService,
+          useValue: prismaServiceMock,
+        },
+      ],
+    }).compile();
 
-    auditLogService = new AuditLogService(mockPrismaService);
+    service = module.get<AuditLogService>(AuditLogService);
+    prismaService = module.get(PrismaService);
   });
 
-  // Original tests
-  it("should add audit log with documentID (positive test)", async () => {
-    const mockLog = {
-      logID: "1",
-      eventType: "CREATE",
-      userID: "user1",
-      details: "Some details",
-      documentID: "doc1",
-    };
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
 
-    mockPrisma.auditLog.create.mockResolvedValue(mockLog);
+  it("should be defined", () => {
+    expect(service).toBeDefined();
+  });
 
-    const result = await auditLogService.addAuditLog({
-      eventType: "CREATE",
-      userID: "user1",
-      details: "Some details",
-      documentID: "doc1",
-    });
-
-    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
-      data: {
+  describe("addAuditLog", () => {
+    it("should create a new audit log successfully", async () => {
+      // Arrange
+      const auditLogData = {
         eventType: "CREATE",
-        userID: "user1",
-        details: "Some details",
-        documentID: "doc1",
-      },
-    });
-    expect(result).toBe(mockLog);
-  });
+        userID: "user123",
+        details: "Created a new document",
+        documentID: "doc123",
+      };
 
-  it("should add audit log without documentID (branch coverage)", async () => {
-    const mockLog = {
-      logID: "2",
-      eventType: "DELETE",
-      userID: "user2",
-      details: "No documentID provided",
-      documentID: null,
-    };
+      const expectedResult = {
+        logID: "1",
+        ...auditLogData,
+        timestamp: new Date(),
+      };
 
-    mockPrisma.auditLog.create.mockResolvedValue(mockLog);
+      prismaService.auditLog.create.mockResolvedValue(expectedResult);
 
-    const result = await auditLogService.addAuditLog({
-      eventType: "DELETE",
-      userID: "user2",
-      details: "No documentID provided",
+      // Act
+      const result = await service.addAuditLog(auditLogData);
+
+      // Assert
+      expect(result).toEqual(expectedResult);
+      expect(prismaService.auditLog.create).toHaveBeenCalledWith({
+        data: auditLogData,
+      });
     });
 
-    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
-      data: {
-        eventType: "DELETE",
-        userID: "user2",
-        details: "No documentID provided",
-        documentID: undefined,
-      },
-    });
-    expect(result).toBe(mockLog);
-  });
+    it("should throw error when prisma create fails", async () => {
+      // Arrange
+      const auditLogData = {
+        eventType: "CREATE",
+        userID: "user123",
+        details: "Created a new document",
+        documentID: "doc123",
+      };
 
-  it("should throw error when prisma.create fails (negative test)", async () => {
-    const mockError = new Error("Database error");
-    mockPrisma.auditLog.create.mockRejectedValue(mockError);
+      const expectedError = new Error("Database error");
+      prismaService.auditLog.create.mockRejectedValue(expectedError);
 
-    await expect(
-      auditLogService.addAuditLog({
-        eventType: "ERROR",
-        userID: "user3",
-        details: "Something went wrong",
-      }),
-    ).rejects.toThrow("Database error");
-
-    expect(mockPrisma.auditLog.create).toHaveBeenCalled();
-  });
-
-  it("should return all audit logs ordered by timestamp desc", async () => {
-    const mockLogs = [{ logID: "1" }, { logID: "2" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-
-    const result = await auditLogService.getAllAuditLogs();
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      select: {
-        logID: true,
-        eventType: true,
-        timestamp: true,
-        userID: true,
-        documentID: true,
-        details: true,
-      },
-      orderBy: {
-        timestamp: "desc",
-      },
+      // Act & Assert
+      await expect(service.addAuditLog(auditLogData)).rejects.toThrow(
+        expectedError,
+      );
+      expect(prismaService.auditLog.create).toHaveBeenCalledWith({
+        data: auditLogData,
+      });
     });
 
-    expect(result).toBe(mockLogs);
-  });
+    it("should create a new audit log without documentID", async () => {
+      // Arrange
+      const auditLogData = {
+        eventType: "LOGIN",
+        userID: "user123",
+        details: "User logged in",
+      };
 
-  // New tests for filtering functionality
+      const expectedResult = {
+        logID: "1",
+        ...auditLogData,
+        documentID: null,
+        timestamp: new Date(),
+      };
 
-  // Test for default pagination without any filters
-  it("should apply default pagination when no filters are provided", async () => {
-    const mockLogs = [{ logID: "1" }, { logID: "2" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(2);
+      prismaService.auditLog.create.mockResolvedValue(expectedResult);
 
-    const result = await auditLogService.getFilteredAuditLogs();
+      // Act
+      const result = await service.addAuditLog(auditLogData);
 
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {},
-      select: {
-        logID: true,
-        eventType: true,
-        timestamp: true,
-        userID: true,
-        documentID: true,
-        details: true,
-      },
-      orderBy: {
-        timestamp: "desc",
-      },
-      skip: 0,
-      take: 10,
-    });
-
-    expect(result).toEqual({
-      logs: mockLogs,
-      pagination: {
-        total: 2,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-      },
+      // Assert
+      expect(result).toEqual(expectedResult);
+      expect(prismaService.auditLog.create).toHaveBeenCalledWith({
+        data: auditLogData,
+      });
     });
   });
 
-  // Test for custom pagination
-  it("should apply custom pagination when provided", async () => {
-    const mockLogs = [{ logID: "3" }, { logID: "4" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(20);
-
-    const filter: AuditLogFilter = {
-      page: 2,
-      limit: 5,
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {},
-      select: {
-        logID: true,
-        eventType: true,
-        timestamp: true,
-        userID: true,
-        documentID: true,
-        details: true,
-      },
-      orderBy: {
-        timestamp: "desc",
-      },
-      skip: 5, // (page-1) * limit
-      take: 5,
-    });
-
-    expect(result).toEqual({
-      logs: mockLogs,
-      pagination: {
-        total: 20,
-        page: 2,
-        limit: 5,
-        totalPages: 4,
-      },
-    });
-  });
-
-  // Test for startDate filter only
-  it("should apply startDate filter correctly", async () => {
-    const mockLogs = [{ logID: "5" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
-
-    const startDate = new Date("2023-01-01");
-    const filter: AuditLogFilter = {
-      startDate,
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        timestamp: {
-          gte: startDate,
+  describe("getAllAuditLogs", () => {
+    it("should return all audit logs ordered by timestamp desc", async () => {
+      // Arrange
+      const mockLogs = [
+        {
+          logID: "1",
+          eventType: "CREATE",
+          timestamp: new Date("2023-01-02"),
+          userID: "user1",
+          documentID: "doc1",
+          details: "details1",
         },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
-    });
-
-    expect(result.logs).toBe(mockLogs);
-  });
-
-  // Test for endDate filter only
-  it("should apply endDate filter correctly", async () => {
-    const mockLogs = [{ logID: "6" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
-
-    const endDate = new Date("2023-12-31");
-    const filter: AuditLogFilter = {
-      endDate,
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        timestamp: {
-          lte: endDate,
+        {
+          logID: "2",
+          eventType: "UPDATE",
+          timestamp: new Date("2023-01-01"),
+          userID: "user2",
+          documentID: "doc2",
+          details: "details2",
         },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
-    });
+      ];
 
-    expect(result.logs).toBe(mockLogs);
-  });
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
 
-  // Test for date range (both startDate and endDate)
-  it("should apply date range filter correctly", async () => {
-    const mockLogs = [{ logID: "7" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
+      // Act
+      const result = await service.getAllAuditLogs();
 
-    const startDate = new Date("2023-01-01");
-    const endDate = new Date("2023-12-31");
-    const filter: AuditLogFilter = {
-      startDate,
-      endDate,
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        timestamp: {
-          gte: startDate,
-          lte: endDate,
+      // Assert
+      expect(result).toEqual(mockLogs);
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith({
+        select: {
+          logID: true,
+          eventType: true,
+          timestamp: true,
+          userID: true,
+          documentID: true,
+          details: true,
         },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
-    });
-
-    expect(result.logs).toBe(mockLogs);
-  });
-
-  // Test for eventType filter
-  it("should apply eventType filter correctly", async () => {
-    const mockLogs = [{ logID: "8" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
-
-    const filter: AuditLogFilter = {
-      eventType: ["CREATE", "UPDATE"],
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        eventType: {
-          in: ["CREATE", "UPDATE"],
+        orderBy: {
+          timestamp: "desc",
         },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
+      });
     });
-
-    expect(result.logs).toBe(mockLogs);
   });
 
-  // Test for empty eventType array
-  it("should not apply eventType filter if array is empty", async () => {
-    const mockLogs = [{ logID: "9" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
-
-    const filter: AuditLogFilter = {
-      eventType: [],
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {},
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
-    });
-
-    expect(result.logs).toBe(mockLogs);
-  });
-
-  // Test for userID filter
-  it("should apply userID filter correctly", async () => {
-    const mockLogs = [{ logID: "10" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
-
-    const filter: AuditLogFilter = {
-      userID: ["user1", "user2"],
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        userID: {
-          in: ["user1", "user2"],
+  describe("findAll", () => {
+    it("should return paginated audit logs with default params", async () => {
+      // Arrange
+      const mockLogs = [
+        {
+          logID: "1",
+          eventType: "CREATE",
+          timestamp: new Date(),
+          userID: "user1",
+          documentID: "doc1",
+          details: "details1",
+          document: {
+            documentName: "Document 1",
+            publisher: "Publisher 1",
+          },
         },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
+      ];
+
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(1);
+
+      // Act
+      const result = await service.findAll({});
+
+      // Assert
+      expect(result).toEqual({
+        data: mockLogs,
+        meta: {
+          total: 1,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+        },
+      });
+
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith({
+        where: {},
+        skip: 0,
+        take: 10,
+        select: {
+          logID: true,
+          eventType: true,
+          timestamp: true,
+          userID: true,
+          documentID: true,
+          details: true,
+          document: {
+            select: {
+              documentName: true,
+              publisher: true,
+            },
+          },
+        },
+        orderBy: {
+          timestamp: "desc",
+        },
+      });
     });
 
-    expect(result.logs).toBe(mockLogs);
+    it("should handle pagination parameters correctly", async () => {
+      // Arrange
+      const mockLogs = [
+        {
+          logID: "1",
+          eventType: "CREATE",
+          timestamp: new Date(),
+          userID: "user1",
+          documentID: "doc1",
+          details: "details1",
+          document: {
+            documentName: "Document 1",
+            publisher: "Publisher 1",
+          },
+        },
+      ];
+
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(30);
+
+      // Act
+      const result = await service.findAll({ page: 3, limit: 10 });
+
+      // Assert
+      expect(result).toEqual({
+        data: mockLogs,
+        meta: {
+          total: 30,
+          page: 3,
+          limit: 10,
+          totalPages: 3,
+        },
+      });
+
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith({
+        where: {},
+        skip: 20,
+        take: 10,
+        select: {
+          logID: true,
+          eventType: true,
+          timestamp: true,
+          userID: true,
+          documentID: true,
+          details: true,
+          document: {
+            select: {
+              documentName: true,
+              publisher: true,
+            },
+          },
+        },
+        orderBy: {
+          timestamp: "desc",
+        },
+      });
+    });
+
+    it("should filter by query string searching across multiple fields", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      // Act
+      const result = await service.findAll({ query: "searchTerm" });
+
+      // Assert
+      const expectedWhereClause = {
+        OR: [
+          { eventType: { contains: "searchTerm", mode: "insensitive" } },
+          { userID: { contains: "searchTerm", mode: "insensitive" } },
+          { details: { contains: "searchTerm", mode: "insensitive" } },
+          {
+            document: {
+              documentName: { contains: "searchTerm", mode: "insensitive" },
+            },
+          },
+        ],
+      };
+
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expectedWhereClause,
+        }),
+      );
+    });
+
+    it("should filter by valid date in query string", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      const dateString = "2023-01-01";
+      const searchDate = new Date(dateString);
+
+      const startOfDay = new Date(searchDate);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(searchDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Act
+      const result = await service.findAll({ query: dateString });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { eventType: { contains: dateString, mode: "insensitive" } },
+              { userID: { contains: dateString, mode: "insensitive" } },
+              { details: { contains: dateString, mode: "insensitive" } },
+              {
+                document: {
+                  documentName: { contains: dateString, mode: "insensitive" },
+                },
+              },
+              {
+                timestamp: {
+                  gte: startOfDay,
+                  lte: endOfDay,
+                },
+              },
+            ],
+          },
+        }),
+      );
+    });
+
+    it("should filter by eventType", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      // Act
+      const result = await service.findAll({ eventType: "CREATE" });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            eventType: "CREATE",
+          },
+        }),
+      );
+    });
+
+    it("should filter by date range with startDate only", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      const startDate = new Date("2023-01-01");
+
+      // Act
+      const result = await service.findAll({ startDate });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            timestamp: {
+              gte: startDate,
+            },
+          },
+        }),
+      );
+    });
+
+    it("should filter by date range with endDate only", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      const endDate = new Date("2023-01-31");
+
+      // Act
+      const result = await service.findAll({ endDate });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            timestamp: {
+              lte: endDate,
+            },
+          },
+        }),
+      );
+    });
+
+    it("should filter by date range with both startDate and endDate", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      const startDate = new Date("2023-01-01");
+      const endDate = new Date("2023-01-31");
+
+      // Act
+      const result = await service.findAll({ startDate, endDate });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            timestamp: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        }),
+      );
+    });
+
+    it("should filter by userId", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      // Act
+      const result = await service.findAll({ userId: "user123" });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userID: "user123",
+          },
+        }),
+      );
+    });
+
+    it("should apply all filters together when provided", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      const query = "search";
+      const eventType = "UPDATE";
+      const startDate = new Date("2023-01-01");
+      const endDate = new Date("2023-01-31");
+      const userId = "user123";
+
+      // Act
+      const result = await service.findAll({
+        query,
+        eventType,
+        startDate,
+        endDate,
+        userId,
+      });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { eventType: { contains: query, mode: "insensitive" } },
+              { userID: { contains: query, mode: "insensitive" } },
+              { details: { contains: query, mode: "insensitive" } },
+              {
+                document: {
+                  documentName: { contains: query, mode: "insensitive" },
+                },
+              },
+            ],
+            eventType,
+            timestamp: {
+              gte: startDate,
+              lte: endDate,
+            },
+            userID: userId,
+          },
+        }),
+      );
+    });
   });
 
-  // Test for empty userID array
-  it("should not apply userID filter if array is empty", async () => {
-    const mockLogs = [{ logID: "11" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
+  describe("count", () => {
+    it("should return count of audit logs with no filters", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(10);
 
-    const filter: AuditLogFilter = {
-      userID: [],
-    };
+      // Act
+      const result = await service.count({});
 
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {},
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
+      // Assert
+      expect(result).toEqual({ count: 10 });
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {},
+      });
     });
 
-    expect(result.logs).toBe(mockLogs);
-  });
+    it("should apply query filter to count", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(5);
 
-  // Test for documentID filter
-  it("should apply documentID filter correctly", async () => {
-    const mockLogs = [{ logID: "12" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
+      // Act
+      const result = await service.count({ query: "searchTerm" });
 
-    const filter: AuditLogFilter = {
-      documentID: ["doc1", "doc2"],
-    };
+      // Assert
+      const expectedWhereClause = {
+        OR: [
+          { eventType: { contains: "searchTerm", mode: "insensitive" } },
+          { userID: { contains: "searchTerm", mode: "insensitive" } },
+          { details: { contains: "searchTerm", mode: "insensitive" } },
+          {
+            document: {
+              documentName: { contains: "searchTerm", mode: "insensitive" },
+            },
+          },
+        ],
+      };
 
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        documentID: {
-          in: ["doc1", "doc2"],
-        },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: expectedWhereClause,
+      });
     });
 
-    expect(result.logs).toBe(mockLogs);
-  });
+    it("should apply eventType filter to count", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(3);
 
-  // Test for empty documentID array
-  it("should not apply documentID filter if array is empty", async () => {
-    const mockLogs = [{ logID: "13" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
+      // Act
+      const result = await service.count({ eventType: "CREATE" });
 
-    const filter: AuditLogFilter = {
-      documentID: [],
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {},
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
+      // Assert
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {
+          eventType: "CREATE",
+        },
+      });
     });
 
-    expect(result.logs).toBe(mockLogs);
-  });
+    it("should apply date range filters to count", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(2);
 
-  // Test for searchTerm filter
-  it("should apply searchTerm filter correctly", async () => {
-    const mockLogs = [{ logID: "14" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
+      const startDate = new Date("2023-01-01");
+      const endDate = new Date("2023-01-31");
 
-    const filter: AuditLogFilter = {
-      searchTerm: "important",
-    };
+      // Act
+      const result = await service.count({ startDate, endDate });
 
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        details: {
-          contains: "important",
-          mode: "insensitive",
+      // Assert
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {
+          timestamp: {
+            gte: startDate,
+            lte: endDate,
+          },
         },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: expect.any(Number),
-      take: expect.any(Number),
+      });
     });
 
-    expect(result.logs).toBe(mockLogs);
-  });
+    it("should apply userId filter to count", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(2);
 
-  // Test for multiple filters combined
-  it("should apply multiple filters correctly", async () => {
-    const mockLogs = [{ logID: "15" }];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockLogs);
-    mockPrisma.auditLog.count.mockResolvedValue(1);
+      // Act
+      const result = await service.count({ userId: "user123" });
 
-    const startDate = new Date("2023-01-01");
-    const endDate = new Date("2023-12-31");
-    const filter: AuditLogFilter = {
-      startDate,
-      endDate,
-      eventType: ["CREATE"],
-      userID: ["user1"],
-      documentID: ["doc1"],
-      searchTerm: "important",
-      page: 2,
-      limit: 5,
-    };
-
-    const result = await auditLogService.getFilteredAuditLogs(filter);
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        timestamp: {
-          gte: startDate,
-          lte: endDate,
+      // Assert
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {
+          userID: "user123",
         },
-        eventType: {
-          in: ["CREATE"],
-        },
-        userID: {
-          in: ["user1"],
-        },
-        documentID: {
-          in: ["doc1"],
-        },
-        details: {
-          contains: "important",
-          mode: "insensitive",
-        },
-      },
-      select: expect.any(Object),
-      orderBy: expect.any(Object),
-      skip: 5,
-      take: 5,
+      });
     });
 
-    expect(result.logs).toBe(mockLogs);
-  });
+    it("should apply all filters together to count when provided", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(1);
 
-  // Tests for the helper methods to get filter options
+      const query = "search";
+      const eventType = "UPDATE";
+      const startDate = new Date("2023-01-01");
+      const endDate = new Date("2023-01-31");
+      const userId = "user123";
 
-  it("should get all unique event types", async () => {
-    const mockEventTypes = [
-      { eventType: "CREATE" },
-      { eventType: "UPDATE" },
-      { eventType: "DELETE" },
-    ];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockEventTypes);
+      // Act
+      const result = await service.count({
+        query,
+        eventType,
+        startDate,
+        endDate,
+        userId,
+      });
 
-    const result = await auditLogService.getEventTypes();
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      select: {
-        eventType: true,
-      },
-      distinct: ["eventType"],
-    });
-
-    expect(result).toEqual(["CREATE", "UPDATE", "DELETE"]);
-  });
-
-  it("should get all unique user IDs", async () => {
-    const mockUserIDs = [
-      { userID: "user1" },
-      { userID: "user2" },
-      { userID: "user3" },
-    ];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockUserIDs);
-
-    const result = await auditLogService.getUserIDs();
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      select: {
-        userID: true,
-      },
-      distinct: ["userID"],
-    });
-
-    expect(result).toEqual(["user1", "user2", "user3"]);
-  });
-
-  it("should get all unique document IDs", async () => {
-    const mockDocumentIDs = [
-      { documentID: "doc1" },
-      { documentID: "doc2" },
-      { documentID: null },
-    ];
-    mockPrisma.auditLog.findMany.mockResolvedValue(mockDocumentIDs);
-
-    const result = await auditLogService.getDocumentIDs();
-
-    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
-      where: {
-        documentID: {
-          not: null,
+      // Assert
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { eventType: { contains: query, mode: "insensitive" } },
+            { userID: { contains: query, mode: "insensitive" } },
+            { details: { contains: query, mode: "insensitive" } },
+            {
+              document: {
+                documentName: { contains: query, mode: "insensitive" },
+              },
+            },
+          ],
+          eventType,
+          timestamp: {
+            gte: startDate,
+            lte: endDate,
+          },
+          userID: userId,
         },
-      },
-      select: {
-        documentID: true,
-      },
-      distinct: ["documentID"],
+      });
     });
-
-    expect(result).toEqual(["doc1", "doc2"]);
   });
 });

@@ -2,21 +2,21 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma } from "@prisma/client";
 
-export type AuditLogFilter = {
-  startDate?: Date;
-  endDate?: Date;
-  eventType?: string[];
-  userID?: string[];
-  documentID?: string[];
-  searchTerm?: string;
+interface PaginationParams {
   page?: number;
   limit?: number;
-};
+  query?: string;
+  eventType?: string;
+  startDate?: Date;
+  endDate?: Date;
+  userId?: string;
+}
 
 @Injectable()
 export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Fungsi untuk menambahkan audit log baru
   async addAuditLog({
     eventType,
     userID,
@@ -43,6 +43,7 @@ export class AuditLogService {
     }
   }
 
+  // Fungsi untuk mendapatkan semua audit log tanpa pagination (versi original)
   async getAllAuditLogs() {
     return this.prisma.auditLog.findMany({
       select: {
@@ -59,60 +60,31 @@ export class AuditLogService {
     });
   }
 
-  async getFilteredAuditLogs(filter: AuditLogFilter = {}) {
-    // Default pagination values
-    const page = filter.page ?? 1;
-    const limit = filter.limit ?? 10;
+  // Fungsi untuk mencari audit log dengan pagination dan filter
+  async findAll(params: PaginationParams) {
+    const {
+      page = 1,
+      limit = 10,
+      query,
+      eventType,
+      startDate,
+      endDate,
+      userId,
+    } = params;
     const skip = (page - 1) * limit;
 
-    // Build the where clause based on filters
-    const where: Prisma.AuditLogWhereInput = {};
+    const where = this.buildWhereClause(
+      query,
+      eventType,
+      startDate,
+      endDate,
+      userId,
+    );
 
-    // Date range filtering
-    if (filter.startDate || filter.endDate) {
-      where.timestamp = {};
-
-      if (filter.startDate) {
-        where.timestamp.gte = filter.startDate;
-      }
-
-      if (filter.endDate) {
-        where.timestamp.lte = filter.endDate;
-      }
-    }
-
-    // Event type filtering
-    if (filter.eventType && filter.eventType.length > 0) {
-      where.eventType = {
-        in: filter.eventType,
-      };
-    }
-
-    // User ID filtering
-    if (filter.userID && filter.userID.length > 0) {
-      where.userID = {
-        in: filter.userID,
-      };
-    }
-
-    // Document ID filtering
-    if (filter.documentID && filter.documentID.length > 0) {
-      where.documentID = {
-        in: filter.documentID,
-      };
-    }
-
-    // Search term (searching in details field)
-    if (filter.searchTerm) {
-      where.details = {
-        contains: filter.searchTerm,
-        mode: "insensitive", // Case-insensitive search
-      };
-    }
-
-    // Fetch the filtered logs
-    const logs = await this.prisma.auditLog.findMany({
+    const auditLogs = await this.prisma.auditLog.findMany({
       where,
+      skip,
+      take: limit,
       select: {
         logID: true,
         eventType: true,
@@ -120,66 +92,115 @@ export class AuditLogService {
         userID: true,
         documentID: true,
         details: true,
+        document: {
+          select: {
+            documentName: true,
+            publisher: true,
+          },
+        },
       },
       orderBy: {
         timestamp: "desc",
       },
-      skip,
-      take: limit,
     });
 
-    // Get the total count for pagination
-    const totalCount = await this.prisma.auditLog.count({ where });
+    const total = await this.prisma.auditLog.count({ where });
 
     return {
-      logs,
-      pagination: {
-        total: totalCount,
+      data: auditLogs,
+      meta: {
+        total,
         page,
         limit,
-        totalPages: Math.ceil(totalCount / limit),
+        totalPages: Math.ceil(total / limit),
       },
     };
   }
 
-  // Get all unique event types for filter dropdown
-  async getEventTypes() {
-    const results = await this.prisma.auditLog.findMany({
-      select: {
-        eventType: true,
-      },
-      distinct: ["eventType"],
-    });
+  // Fungsi untuk menghitung jumlah audit log berdasarkan filter
+  async count(params: PaginationParams) {
+    const { query, eventType, startDate, endDate, userId } = params;
 
-    return results.map((item) => item.eventType);
+    const where = this.buildWhereClause(
+      query,
+      eventType,
+      startDate,
+      endDate,
+      userId,
+    );
+
+    const count = await this.prisma.auditLog.count({ where });
+
+    return { count };
   }
 
-  // Get all unique user IDs for filter dropdown
-  async getUserIDs() {
-    const results = await this.prisma.auditLog.findMany({
-      select: {
-        userID: true,
-      },
-      distinct: ["userID"],
-    });
+  // Fungsi untuk membangun clause WHERE untuk pencarian
+  private buildWhereClause(
+    query?: string,
+    eventType?: string,
+    startDate?: Date,
+    endDate?: Date,
+    userId?: string,
+  ): Prisma.AuditLogWhereInput {
+    const where: Prisma.AuditLogWhereInput = {};
 
-    return results.map((item) => item.userID);
-  }
+    // Handle search query across multiple fields
+    if (query) {
+      // Coba parse query sebagai tanggal jika formatnya sesuai
+      const possibleDate = new Date(query);
+      const isValidDate = !isNaN(possibleDate.getTime());
 
-  // Get all unique document IDs for filter dropdown
-  async getDocumentIDs() {
-    const results = await this.prisma.auditLog.findMany({
-      where: {
-        documentID: {
-          not: null,
+      where.OR = [
+        { eventType: { contains: query, mode: "insensitive" } },
+        { userID: { contains: query, mode: "insensitive" } },
+        { details: { contains: query, mode: "insensitive" } },
+        {
+          document: { documentName: { contains: query, mode: "insensitive" } },
         },
-      },
-      select: {
-        documentID: true,
-      },
-      distinct: ["documentID"],
-    });
+      ];
 
-    return results.map((item) => item.documentID).filter(Boolean);
+      // Jika query tampak seperti tanggal yang valid, tambahkan ke pencarian
+      if (isValidDate) {
+        // Tentukan rentang tanggal untuk satu hari
+        const startOfDay = new Date(possibleDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(possibleDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        // Tambahkan pencarian berdasarkan tanggal
+        where.OR.push({
+          timestamp: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        });
+      }
+    }
+
+    // Filter by event type
+    if (eventType) {
+      where.eventType = eventType;
+    }
+
+    // Filter by date range
+    if (startDate || endDate) {
+      where.timestamp = {};
+
+      if (startDate) {
+        where.timestamp.gte = startDate;
+      }
+
+      if (endDate) {
+        where.timestamp.lte = endDate;
+      }
+    }
+
+    // Filter by user ID
+    if (userId) {
+      where.userID = userId;
+    }
+
+    return where;
   }
 }
