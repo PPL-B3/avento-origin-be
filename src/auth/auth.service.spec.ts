@@ -7,6 +7,7 @@ import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "./jwt/jwt.service";
 import { AuditLogService } from "../auditLog/auditLog.service";
+import { Role } from "@prisma/client";
 
 describe("AuthService", () => {
   let authService: AuthService;
@@ -134,7 +135,7 @@ describe("AuthService", () => {
       id: "123",
       email: "test@test.com",
       password: "hashedpassword",
-      role: "user",
+      role: Role.USER,
       lastLogout: BigInt(Date.now()),
     };
 
@@ -148,7 +149,6 @@ describe("AuthService", () => {
       data: {
         email: dto.email,
         password: "hashedpassword",
-        role: "user",
         lastLogout: expect.any(BigInt),
       },
     });
@@ -213,7 +213,7 @@ describe("AuthService", () => {
       id: "123",
       email: dto.email,
       password: "hashedpassword",
-      role: "user",
+      role: Role.USER,
       lastLogout: BigInt(Date.now()),
     };
 
@@ -264,7 +264,7 @@ describe("AuthService", () => {
       id: "123",
       email: dto.email,
       password: "hashedpassword",
-      role: "user",
+      role: Role.USER,
       lastLogout: BigInt(Date.now()),
     };
 
@@ -305,7 +305,7 @@ describe("AuthService", () => {
       id: string;
       email: string;
       password: string;
-      role: string;
+      role: Role;
       lastLogout: bigint;
     };
 
@@ -314,7 +314,7 @@ describe("AuthService", () => {
         id: "123",
         email: "test@test.com",
         password: "hashedpassword",
-        role: "user",
+        role: Role.USER,
         lastLogout: BigInt(0),
       };
     });

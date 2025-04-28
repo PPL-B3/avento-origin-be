@@ -22,7 +22,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-    })
+    }),
   );
   app.enableCors();
   app.useGlobalPipes(new ValidationPipe());
@@ -39,7 +39,7 @@ async function bootstrap() {
   SwaggerModule.setup(
     configService.get<string>("API_ENDPOINT", "api-default"),
     app,
-    documentFactory
+    documentFactory,
   );
 
   await app.listen(process.env.PORT ?? 4000);
