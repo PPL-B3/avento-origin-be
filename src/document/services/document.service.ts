@@ -349,6 +349,33 @@ export class DocumentService {
     return response;
   }
 
+  async getDocument(documentId: string) {
+    const document = await this.documentRepo.findDocumentById(documentId);
+    const currentOwner = this.getCurrentOwner(document);
+    const ownershipMap = new Map<string, { owner: string; generatedDate: Date }>();
+    for (const code of document.qrCode) {
+      const key = code.generatedDate.toISOString();
+      if (!ownershipMap.has(key)) {
+        ownershipMap.set(key, {
+          owner: code.owner,
+          generatedDate: code.generatedDate,
+        });
+      }
+    }
+    const ownershipHistory = Array.from(ownershipMap.values()).sort(
+      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime(),
+    );
+    return {
+      documentId: document.documentID,
+      documentName: document.documentName,
+      uploadDate: document.uploadDate,
+      publisher: document.publisher,
+      currentOwner,
+      ownershipHistory,
+      filePath: document.filePath,
+    };
+  }
+
   async reverseOwnership(documentId: string, index: number) {
     return await this.prisma.$transaction(async (tx) => {
       const document = await this.documentRepo.findDocumentById(documentId, tx);
