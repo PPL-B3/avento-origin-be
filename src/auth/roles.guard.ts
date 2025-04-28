@@ -11,7 +11,7 @@ import { ROLES_KEY } from "./roles.decorator";
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(
-    private reflector: Reflector,
+    private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
   ) {}
 
