@@ -15,7 +15,7 @@ export class AuthService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
-    private auditLogService: AuditLogService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -71,7 +71,6 @@ export class AuthService {
         data: {
           email: dto.email,
           password: hash,
-          role: "user",
           lastLogout: BigInt(Date.now()),
         },
       });

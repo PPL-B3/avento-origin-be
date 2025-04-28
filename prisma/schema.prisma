@@ -14,6 +14,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+    USER
+    ADMIN
+}
+
 model Message {
   id        Int      @id @default(autoincrement())
   content   String
@@ -24,12 +29,14 @@ model Message {
 
 model User {
   id         String @id @default(uuid())
+  createdAt  DateTime @default(now())
   email      String @unique
   password   String
-  role       String
+  role       Role @default(USER)
   lastLogout BigInt
 
   @@map("users")
+  @@index([createdAt])
 }
 
 model Document {
@@ -57,7 +64,24 @@ model QrCode {
     document Document @relation(fields: [documentId], references: [documentID])
     documentId String
 
+    qrCodeOTP     QrCodeOTP? // <-- Add this (optional, because not all QR codes have OTPs)
+
     @@map("qrcodes")
+}
+
+model QrCodeOTP {
+  id            String   @id @default(uuid())
+  qrCode        QrCode   @relation(fields: [qrCodeId], references: [id])
+  qrCodeId      String   @unique
+  otp           String
+  expiry        DateTime
+  attemptCount  Int      @default(0)
+  cooldown DateTime
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("qrcode_otps")
 }
 
 model AuditLog {

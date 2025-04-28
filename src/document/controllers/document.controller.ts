@@ -6,7 +6,9 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { ClaimDocumentDTO } from "../dto/claim-document.dto";
@@ -20,6 +22,12 @@ import {
   ApiOperation,
   ApiResponse,
 } from "@nestjs/swagger";
+import { Request } from "express";
+import { AccessQrCodeDTO } from "../dto/access-qr-code.dto";
+import { ReverseOwnershipDTO } from "../dto/reverse-ownership.dto";
+import { Roles } from "../../auth/roles.decorator";
+import { JwtAuthMiddleware } from "../../auth/jwt/middleware/jwt-auth.middleware";
+import { RolesGuard } from "../../auth/roles.guard";
 
 @Controller("documents")
 export class DocumentController {
@@ -72,6 +80,7 @@ export class DocumentController {
   @ApiResponse({ status: 500, description: "Internal Server Error" })
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File,
+    @Req() request: Request,
     @Body() body: UploadDocumentDTO
   ) {
     if (!file) {
@@ -84,7 +93,11 @@ export class DocumentController {
       throw new BadRequestException("File size exceeds 8MB limit.");
     }
 
-    return await this.docService.uploadDocument(file, body);
+    return await this.docService.uploadDocument(
+      file,
+      body,
+      request["user"].userId
+    );
   }
 
   @Post("transfer")
@@ -103,6 +116,30 @@ export class DocumentController {
   @Get("view/:qrId")
   async viewDocument(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
     return await this.docService.viewDocument(qrId);
+  }
+
+  @Get("get-document/:documentId")
+  @UseGuards(JwtAuthMiddleware, RolesGuard)
+  @Roles("ADMIN")
+  async getDocument(
+    @Param("documentId", new ParseUUIDPipe()) documentId: string
+  ) {
+    return this.docService.getDocument(documentId);
+  }
+
+  @Get("access/:qrId")
+  async requestQrCodeOTP(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
+    return await this.docService.requestQrCodeOTP(qrId);
+  }
+
+  @Post("access")
+  async validateQrCodeOTP(@Body() body: AccessQrCodeDTO) {
+    return await this.docService.validateQrCodeOTP(body.qrId, body.otp);
+  }
+
+  @Post("reverse")
+  async reverseOwnership(@Body() body: ReverseOwnershipDTO) {
+    return await this.docService.reverseOwnership(body.documentId, body.index);
   }
 
   @Get("test-error")
