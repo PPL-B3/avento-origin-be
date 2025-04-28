@@ -1057,4 +1057,60 @@ describe("DocumentService", () => {
       });
     });
   });
+
+  describe("DocumentService – getDocument", () => {
+    let service: DocumentService;
+    let repo: any;
+
+    beforeEach(() => {
+      repo = { findDocumentById: jest.fn() };
+      service = new DocumentService(
+        {} as any, // s3Storage
+        repo,
+        {} as any, // email
+        {} as any, // config
+        {} as any, // posthog
+        {} as any, // prisma
+        {} as any  // auditLog
+      );
+    });
+
+    it("should return full document info when found", async () => {
+      const fakeDoc = {
+        documentID: "doc-1",
+        documentName: "TestDoc",
+        uploadDate: new Date("2025-01-01"),
+        publisher: "alice@example.com",
+        filePath: "/path/to/file.pdf",
+        qrCode: [
+          { owner: "Alice", generatedDate: new Date("2025-01-01T08:00:00Z") },
+          { owner: "Bob", generatedDate: new Date("2025-01-02T10:00:00Z") },
+          // duplicate date should be deduped
+          { owner: "Bob", generatedDate: new Date("2025-01-02T10:00:00Z") },
+        ],
+      };
+      repo.findDocumentById.mockResolvedValue(fakeDoc);
+
+      const result = await service.getDocument("doc-1");
+
+      expect(repo.findDocumentById).toHaveBeenCalledWith("doc-1");
+      expect(result).toEqual({
+        documentId: "doc-1",
+        documentName: "TestDoc",
+        uploadDate: new Date("2025-01-01"),
+        publisher: "alice@example.com",
+        filePath: "/path/to/file.pdf",
+        currentOwner: "Bob",
+        ownershipHistory: [
+          { owner: "Alice", generatedDate: new Date("2025-01-01T08:00:00Z") },
+          { owner: "Bob", generatedDate: new Date("2025-01-02T10:00:00Z") },
+        ],
+      });
+    });
+
+    it("should bubble up if document not found", async () => {
+      repo.findDocumentById.mockRejectedValue(new Error("Not found"));
+      await expect(service.getDocument("missing")).rejects.toThrow("Not found");
+    });
+  });
 });
