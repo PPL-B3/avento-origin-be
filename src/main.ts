@@ -40,7 +40,7 @@ async function bootstrap() {
   SwaggerModule.setup(
     configService.get<string>("API_ENDPOINT", "api-default"),
     app,
-    documentFactory
+    documentFactory,
   );
 
   await app.listen(process.env.PORT ?? 4000);

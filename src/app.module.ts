@@ -1,11 +1,10 @@
 import {
   MiddlewareConsumer,
-  // MiddlewareConsumer,
   Module,
   NestModule,
-  // NestModule,
-  // RequestMethod,
+  RequestMethod,
 } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { DocumentsModule } from "./document/document.module";
 import { HelloModule } from "./hello/hello.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -15,6 +14,8 @@ import { ConfigModule } from "@nestjs/config";
 import { PrometheusModule } from "@willsoto/nestjs-prometheus";
 import { AuditLogModule } from "./auditLog/auditLog.module";
 import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
+import { RolesGuard } from "./auth/roles.guard";
+import { AdminSeederService } from "./auth/adminseeder.service";
 
 @Module({
   imports: [
@@ -28,10 +29,19 @@ import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
     }),
     AuditLogModule,
   ],
-  providers: [PrismaService],
+  providers: [
+    PrismaService,
+    { provide: APP_GUARD, useClass: RolesGuard },
+    AdminSeederService,
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(JwtAuthMiddleware).forRoutes("documents/upload");
+    consumer
+      .apply(JwtAuthMiddleware)
+      .forRoutes(
+        { path: "documents/upload", method: RequestMethod.ALL },
+        { path: "audit-log", method: RequestMethod.ALL },
+      );
   }
 }
