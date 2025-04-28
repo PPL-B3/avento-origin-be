@@ -3,6 +3,7 @@ import { DocumentController } from "./document.controller";
 import { DocumentService } from "../services/document.service";
 import * as request from "supertest";
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   INestApplication,
@@ -13,6 +14,7 @@ import {
 import { MulterModule } from "@nestjs/platform-express";
 import * as path from "path";
 import * as fs from "fs";
+import { ReverseOwnershipDTO } from "../dto/reverse-ownership.dto";
 
 @Injectable()
 class MockAuthGuard implements CanActivate {
@@ -38,6 +40,7 @@ describe("DocumentController", () => {
     claimDocument: jest.fn(),
     viewDocument: jest.fn(),
     validateQrCodeOTP: jest.fn(),
+    reverseOwnership: jest.fn(),
   };
 
   // beforeEach(() => {
@@ -299,6 +302,61 @@ describe("DocumentController", () => {
           expect.stringContaining("otp should not be empty"),
         ])
       );
+    });
+  });
+
+  describe("/documents/reverse (POST)", () => {
+    const reverseDTO: ReverseOwnershipDTO = {
+      documentId: "doc-test-id",
+      index: 1,
+    };
+
+    it("should call docService.reverseOwnership and return 201 on success", async () => {
+      mockDocService.reverseOwnership.mockResolvedValue(undefined);
+
+      const res = await request(app.getHttpServer())
+        .post("/documents/reverse")
+        .send(reverseDTO);
+
+      expect(res.status).toBe(201);
+      expect(mockDocService.reverseOwnership).toHaveBeenCalledWith(
+        reverseDTO.documentId,
+        reverseDTO.index
+      );
+    });
+
+    it("should forward BadRequestException from service", async () => {
+      const error = new BadRequestException("Index out of range.");
+      mockDocService.reverseOwnership.mockRejectedValue(error);
+
+      const res = await request(app.getHttpServer())
+        .post("/documents/reverse")
+        .send(reverseDTO);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe("Index out of range.");
+    });
+
+    it("should return 500 if service throws unexpected error", async () => {
+      mockDocService.reverseOwnership.mockRejectedValue(
+        new Error("Unexpected DB error")
+      );
+
+      const res = await request(app.getHttpServer())
+        .post("/documents/reverse")
+        .send(reverseDTO);
+
+      expect(res.status).toBe(500);
+      expect(res.body.message).toBe("Internal server error");
+    });
+
+    it("should return 400 for invalid DTO (e.g., missing index)", async () => {
+      const invalidDto = { documentId: "doc-test-id" };
+      const res = await request(app.getHttpServer())
+        .post("/documents/reverse")
+        .send(invalidDto);
+      expect(res.status).toBe(400);
+      expect(mockDocService.reverseOwnership).not.toHaveBeenCalled();
     });
   });
 });

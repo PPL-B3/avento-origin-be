@@ -13,15 +13,15 @@ export class DocumentRepository {
       return await this.generateAndAttachQrCodes(
         transaction,
         data.publisher,
-        document.documentID,
+        document.documentID
       );
     });
   }
 
   async changeOwnership(
     transaction: Prisma.TransactionClient,
-    pendingOwner: string,
-    documentId: string,
+    nextOwner: string,
+    documentId: string
   ) {
     const document = await this.findDocumentById(documentId, transaction);
 
@@ -31,31 +31,31 @@ export class DocumentRepository {
         transaction.qrCode.update({
           where: { id: qr.id },
           data: { isActive: false },
-        }),
-      ),
+        })
+      )
     );
 
     return await this.generateAndAttachQrCodes(
       transaction,
-      pendingOwner,
-      documentId,
+      nextOwner,
+      documentId
     );
   }
 
   private async generateAndAttachQrCodes(
     transactions: Prisma.TransactionClient,
     owner: string,
-    documentId: string,
+    documentId: string
   ): Promise<{ privateId: string; publicId: string; documentId: string }> {
     const qrCodeBatch = this.createQrCodeBatch(owner, documentId);
 
     const qrCodes = await Promise.all(
-      qrCodeBatch.map((qr) => transactions.qrCode.create({ data: qr })),
+      qrCodeBatch.map((qr) => transactions.qrCode.create({ data: qr }))
     );
 
-    const privateQr = qrCodes.find((qr) => qr.isPrivate);
     const publicQr = qrCodes.find((qr) => !qr.isPrivate);
-    if (!privateQr || !publicQr)
+    const privateQr = qrCodes.find((qr) => qr.isPrivate);
+    if (!publicQr || !privateQr)
       throw new Error("Failed creating private and/or public QR codes.");
 
     await transactions.document.update({
@@ -74,7 +74,7 @@ export class DocumentRepository {
 
   async findDocumentById(
     documentId: string,
-    transaction: Prisma.TransactionClient = this.prisma,
+    transaction: Prisma.TransactionClient = this.prisma
   ) {
     const document = await transaction.document.findUnique({
       where: { documentID: documentId },
@@ -93,7 +93,7 @@ export class DocumentRepository {
   async updateDocument(
     documentId: string,
     data: Prisma.DocumentUpdateInput,
-    transaction: Prisma.TransactionClient = this.prisma,
+    transaction: Prisma.TransactionClient = this.prisma
   ): Promise<Document> {
     return transaction.document.update({
       where: { documentID: documentId },

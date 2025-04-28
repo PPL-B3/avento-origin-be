@@ -933,4 +933,128 @@ describe("DocumentService", () => {
       expect(result).toEqual(mockQrCode);
     });
   });
+
+  describe("reverseOwnership", () => {
+    let service: DocumentService;
+    let repo: jest.Mocked<DocumentRepository>;
+    let prisma: jest.Mocked<PrismaService>;
+    let auditLog: jest.Mocked<AuditLogService>;
+
+    beforeEach(() => {
+      repo = {
+        findDocumentById: jest.fn(),
+        changeOwnership: jest.fn(),
+      } as any;
+      prisma = {
+        $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
+        user: {
+          findFirst: jest.fn(),
+        },
+      } as any;
+      auditLog = {
+        addAuditLog: jest.fn(),
+      } as any;
+
+      // We don't need other dependencies for this test
+      service = new DocumentService(
+        null as any, // s3Storage
+        repo,
+        null as any, // emailService
+        null as any, // config
+        null as any, // posthog
+        prisma,
+        auditLog
+      );
+    });
+
+    it("should throw BadRequestException when index is out of range", async () => {
+      const qrCodes = Array(4).fill({
+        owner: "owner",
+        id: "id",
+        isActive: true,
+        isPrivate: false,
+        generatedDate: new Date(),
+        documentId: "doc",
+      });
+      repo.findDocumentById.mockResolvedValue({
+        documentID: "doc",
+        qrCode: qrCodes,
+      } as any);
+
+      await expect(service.reverseOwnership("doc", 2)).rejects.toBeInstanceOf(
+        BadRequestException
+      );
+
+      expect(repo.findDocumentById).toHaveBeenCalledWith("doc", prisma);
+      expect(repo.changeOwnership).not.toHaveBeenCalled();
+      expect(auditLog.addAuditLog).not.toHaveBeenCalled();
+    });
+
+    it("should reverse ownership and record an audit log", async () => {
+      // Arrange
+      const documentId = "doc-id";
+      const qrCodes = [
+        {
+          owner: "prevOwner",
+          id: "a",
+          isActive: true,
+          isPrivate: false,
+          generatedDate: new Date(),
+          documentId,
+        },
+        {
+          owner: "x",
+          id: "b",
+          isActive: true,
+          isPrivate: true,
+          generatedDate: new Date(),
+          documentId,
+        },
+        {
+          owner: "activeOwner",
+          id: "c",
+          isActive: false,
+          isPrivate: false,
+          generatedDate: new Date(),
+          documentId,
+        },
+        {
+          owner: "z",
+          id: "d",
+          isActive: false,
+          isPrivate: true,
+          generatedDate: new Date(),
+          documentId,
+        },
+      ];
+      repo.findDocumentById.mockResolvedValue({
+        documentID: documentId,
+        qrCode: qrCodes,
+      } as any);
+      repo.changeOwnership.mockResolvedValue(null as any);
+      const admin = { id: "admin-123" };
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue(admin);
+
+      // Act
+      await service.reverseOwnership(documentId, 0);
+
+      // Assert
+      expect(repo.findDocumentById).toHaveBeenCalledWith(documentId, prisma);
+      expect(repo.changeOwnership).toHaveBeenCalledWith(
+        prisma,
+        "prevOwner",
+        documentId
+      );
+      expect(prisma.user.findFirst).toHaveBeenCalledWith({
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      expect(auditLog.addAuditLog).toHaveBeenCalledWith({
+        eventType: "REVERSE_OWNERSHIP",
+        userID: admin.id,
+        details: `Ownership reversed from activeOwner to prevOwner.`,
+        documentID: documentId,
+      });
+    });
+  });
 });

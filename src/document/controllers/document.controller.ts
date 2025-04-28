@@ -23,6 +23,7 @@ import {
 } from "@nestjs/swagger";
 import { Request } from "express";
 import { AccessQrCodeDTO } from "../dto/access-qr-code.dto";
+import { ReverseOwnershipDTO } from "../dto/reverse-ownership.dto";
 
 @Controller("documents")
 export class DocumentController {
@@ -121,6 +122,11 @@ export class DocumentController {
   @Post("access")
   async validateQrCodeOTP(@Body() body: AccessQrCodeDTO) {
     return await this.docService.validateQrCodeOTP(body.qrId, body.otp);
+  }
+
+  @Post("reverse")
+  async reverseOwnership(@Body() body: ReverseOwnershipDTO) {
+    return await this.docService.reverseOwnership(body.documentId, body.index);
   }
 
   @Get("test-error")
