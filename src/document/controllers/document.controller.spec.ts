@@ -15,6 +15,11 @@ import { MulterModule } from "@nestjs/platform-express";
 import * as path from "path";
 import * as fs from "fs";
 import { ReverseOwnershipDTO } from "../dto/reverse-ownership.dto";
+import { JwtService } from "../../auth/jwt/jwt.service";
+import { PrismaService } from "../../prisma/prisma.service";
+import { ConfigService } from "@nestjs/config";
+import { JwtAuthMiddleware } from "../../auth/jwt/middleware/jwt-auth.middleware";
+import { RolesGuard } from "../../auth/roles.guard";
 
 @Injectable()
 class MockAuthGuard implements CanActivate {
@@ -53,7 +58,12 @@ describe("DocumentController", () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [MulterModule.register({})],
       controllers: [DocumentController],
-      providers: [{ provide: DocumentService, useValue: mockDocService }],
+      providers: [
+        { provide: DocumentService, useValue: mockDocService },
+        JwtService,
+        PrismaService,
+        ConfigService,
+      ],
     }).compile();
 
     app = moduleRef.createNestApplication();
@@ -357,6 +367,96 @@ describe("DocumentController", () => {
         .send(invalidDto);
       expect(res.status).toBe(400);
       expect(mockDocService.reverseOwnership).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("/documents/get-document/:documentId (GET)", () => {
+    let app: INestApplication;
+    let mockDocService: Partial<Record<keyof DocumentService, jest.Mock>>;
+
+    beforeAll(async () => {
+      mockDocService = {
+        getDocument: jest.fn(),
+      };
+
+      const moduleRef: TestingModule = await Test.createTestingModule({
+        imports: [MulterModule.register({})],
+        controllers: [DocumentController],
+        providers: [{ provide: DocumentService, useValue: mockDocService }],
+      })
+        // stub out both guards so they never run
+        .overrideGuard(JwtAuthMiddleware)
+        .useValue({ canActivate: () => true })
+        .overrideGuard(RolesGuard)
+        .useValue({ canActivate: () => true })
+        .compile();
+
+      app = moduleRef.createNestApplication();
+      app.useGlobalPipes(
+        new ValidationPipe({ whitelist: true, transform: true }),
+      );
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("200 + payload when document is found", async () => {
+      const payload = {
+        documentId: "doc-1",
+        documentName: "Name",
+        uploadDate: "2025-04-28T00:00:00.000Z",
+        publisher: "x",
+        currentOwner: "y",
+        ownershipHistory: [],
+        filePath: "/f.pdf",
+      };
+      mockDocService.getDocument!.mockResolvedValue(payload);
+
+      const res = await request(app.getHttpServer())
+        .get("/documents/get-document/123e4567-e89b-12d3-a456-426614174000");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(payload);
+      expect(mockDocService.getDocument).toHaveBeenCalledWith(
+        "123e4567-e89b-12d3-a456-426614174000"
+      );
+    });
+
+    it("400 on invalid UUID", async () => {
+      const res = await request(app.getHttpServer())
+        .get("/documents/get-document/not-a-uuid");
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toContain("Validation failed");
+      expect(mockDocService.getDocument).not.toHaveBeenCalled();
+    });
+
+    it("404 when service throws NotFoundException", async () => {
+      mockDocService.getDocument!.mockRejectedValue(
+        new NotFoundException("Doc not found")
+      );
+
+      const res = await request(app.getHttpServer())
+        .get("/documents/get-document/123e4567-e89b-12d3-a456-426614174000");
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toBe("Doc not found");
+    });
+
+    it("500 when service throws generic error", async () => {
+      mockDocService.getDocument!.mockRejectedValue(new Error("oops"));
+
+      const res = await request(app.getHttpServer())
+        .get("/documents/get-document/123e4567-e89b-12d3-a456-426614174000");
+
+      expect(res.status).toBe(500);
+      expect(res.body.message).toBe("Internal server error");
     });
   });
 });

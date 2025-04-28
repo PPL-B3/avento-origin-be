@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { ClaimDocumentDTO } from "../dto/claim-document.dto";
@@ -24,6 +25,9 @@ import {
 import { Request } from "express";
 import { AccessQrCodeDTO } from "../dto/access-qr-code.dto";
 import { ReverseOwnershipDTO } from "../dto/reverse-ownership.dto";
+import { Roles } from "../../auth/roles.decorator";
+import { JwtAuthMiddleware } from "../../auth/jwt/middleware/jwt-auth.middleware";
+import { RolesGuard } from "../../auth/roles.guard";
 
 @Controller("documents")
 export class DocumentController {
@@ -112,6 +116,15 @@ export class DocumentController {
   @Get("view/:qrId")
   async viewDocument(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
     return await this.docService.viewDocument(qrId);
+  }
+
+  @Get("get-document/:documentId")
+  @UseGuards(JwtAuthMiddleware, RolesGuard)
+  @Roles("ADMIN")
+  async getDocument(
+    @Param("documentId", new ParseUUIDPipe()) documentId: string
+  ) {
+    return this.docService.getDocument(documentId);
   }
 
   @Get("access/:qrId")
