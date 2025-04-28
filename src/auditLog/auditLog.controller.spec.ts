@@ -1,6 +1,11 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AuditLogService } from "./auditLog.service";
 import { AuditLogController } from "./auditLog.controller";
+import { JwtAuthMiddleware } from "../auth/jwt/middleware/jwt-auth.middleware";
+import { RolesGuard } from "../auth/roles.guard";
+import { JwtService } from "../auth/jwt/jwt.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { ConfigService } from "@nestjs/config";
 
 describe("AuditLogController", () => {
   let controller: AuditLogController;
@@ -22,13 +27,27 @@ describe("AuditLogController", () => {
           provide: AuditLogService,
           useValue: mockAuditLogService,
         },
+        {
+          provide: JwtAuthMiddleware,
+          useValue: { use: (_req, _res, next) => next() },
+        },
+        {
+          provide: RolesGuard,
+          useValue: { canActivate: () => true },
+        },
+        {
+          provide: JwtService,
+          useValue: {},
+        },
+        {
+          provide: PrismaService,
+          useValue: {},
+        },
       ],
     }).compile();
 
     controller = module.get<AuditLogController>(AuditLogController);
   });
-
-
 
   describe("getAllAuditLogs", () => {
     it("should return all audit logs (positive test)", async () => {
