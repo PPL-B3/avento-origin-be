@@ -22,6 +22,7 @@ import {
   ApiResponse,
 } from "@nestjs/swagger";
 import { Request } from "express";
+import { AccessQrCodeDTO } from "../dto/access-qr-code.dto";
 
 @Controller("documents")
 export class DocumentController {
@@ -75,7 +76,7 @@ export class DocumentController {
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File,
     @Req() request: Request,
-    @Body() body: UploadDocumentDTO,
+    @Body() body: UploadDocumentDTO
   ) {
     if (!file) {
       throw new BadRequestException("No file uploaded.");
@@ -90,7 +91,7 @@ export class DocumentController {
     return await this.docService.uploadDocument(
       file,
       body,
-      request["user"].userId,
+      request["user"].userId
     );
   }
 
@@ -98,7 +99,7 @@ export class DocumentController {
   async transferDocument(@Body() body: TransferDocumentDTO) {
     return await this.docService.transferDocument(
       body.documentId,
-      body.pendingOwner,
+      body.pendingOwner
     );
   }
 
@@ -113,14 +114,19 @@ export class DocumentController {
   }
 
   @Get("access/:qrId")
-  async requestOtp(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
+  async requestQrCodeOTP(@Param("qrId", new ParseUUIDPipe()) qrId: string) {
     return await this.docService.requestQrCodeOTP(qrId);
+  }
+
+  @Post("access")
+  async validateQrCodeOTP(@Body() body: AccessQrCodeDTO) {
+    return await this.docService.validateQrCodeOTP(body.qrId, body.otp);
   }
 
   @Get("test-error")
   testError(): never {
     throw new Error(
-      "This is a test error. Should always trigger error handler.",
+      "This is a test error. Should always trigger error handler."
     );
   }
 }

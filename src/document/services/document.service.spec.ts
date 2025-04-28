@@ -41,7 +41,9 @@ describe("DocumentService", () => {
       },
       qrCodeOTP: {
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     } as any;
     auditLog = {
@@ -85,7 +87,7 @@ describe("DocumentService", () => {
         file.buffer,
         file.mimetype,
         "bucket-name",
-        expect.stringMatching(/^alice@example\.com_My-Doc_\d+\.pdf$/),
+        expect.stringMatching(/^alice@example\.com_My-Doc_\d+\.pdf$/)
       );
       expect(repo.createDocument).toHaveBeenCalled();
       expect(result).toEqual({
@@ -102,8 +104,8 @@ describe("DocumentService", () => {
           {
             documentName: "x",
           },
-          "user-id-123",
-        ),
+          "user-id-123"
+        )
       ).rejects.toThrow("DO_SPACES_BUCKET is not configured");
     });
 
@@ -144,7 +146,9 @@ describe("DocumentService", () => {
         publicId: "new-qr-public",
         documentId: "new-document-id",
       });
-      (prisma.user.findUniqueOrThrow as jest.Mock).mockRejectedValue(new Error("Not Found"));
+      (prisma.user.findUniqueOrThrow as jest.Mock).mockRejectedValue(
+        new Error("Not Found")
+      );
 
       const file = {
         buffer: Buffer.from("pdf"),
@@ -152,7 +156,7 @@ describe("DocumentService", () => {
       } as any;
       const dto = { documentName: "No Audit" };
       await expect(
-        service.uploadDocument(file, dto, "ghost-user"),
+        service.uploadDocument(file, dto, "ghost-user")
       ).rejects.toThrow();
       expect(auditLog.addAuditLog).not.toHaveBeenCalled();
     });
@@ -354,13 +358,27 @@ describe("DocumentService", () => {
       const result = (service as any).generateFilename(dto, 123456, "John Doe");
       expect(result).toBe("John-Doe_My-Doc_123456.pdf");
     });
+
+    it("should calculate remaining minutes correctly (rounding up)", () => {
+      const now = new Date("2025-04-26T10:00:00.000Z");
+      const cooldown = new Date("2025-04-26T10:04:30.000Z"); // 4.5 mins later
+      const result = (service as any).getRetryText(cooldown, now);
+      expect(result).toBe("Retry in 5 minute(s).");
+    });
+
+    it("should show 1 minute for less than a minute remaining", () => {
+      const now = new Date("2025-04-26T10:00:00.000Z");
+      const cooldown = new Date("2025-04-26T10:00:15.000Z"); // 15 seconds later
+      const result = (service as any).getRetryText(cooldown, now);
+      expect(result).toBe("Retry in 1 minute(s).");
+    });
   });
 
   describe("view document", () => {
     it("should throw NotFoundException if QR code is not found", async () => {
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
       await expect(service.viewDocument("non-existent-id")).rejects.toThrow(
-        new NotFoundException("QR code not found"),
+        new NotFoundException("QR code not found")
       );
     });
 
@@ -371,7 +389,7 @@ describe("DocumentService", () => {
       } as any);
 
       await expect(service.viewDocument("qr-inactive")).rejects.toThrow(
-        new BadRequestException("QR code exists but is inactive"),
+        new BadRequestException("QR code exists but is inactive")
       );
       expect(prisma.qrCode.findUnique).toHaveBeenCalledWith({
         where: { id: "qr-inactive" },
@@ -589,124 +607,330 @@ describe("DocumentService", () => {
   });
 
   describe("requestQrCodeOTP", () => {
-    const qrId = "123e4567-e89b-12d3-a456-426614174000"; // valid uuid
-    const now = new Date();
-    const fakeQrCode = {
+    const qrId = "valid-private-qr-id";
+    const mockQrCode = {
       id: qrId,
-      owner: "owner@example.com",
       isActive: true,
       isPrivate: true,
-      document: {
-        documentName: "Test Document",
-      },
+      owner: "owner@example.com",
+      document: { documentName: "Private Doc" },
     };
+    const mockOtp = "654321";
 
     beforeEach(() => {
+      // Reset mocks before each test in this describe block
+      jest.clearAllMocks();
+      // Mock generateOtp if it's a method of the class
+      jest.spyOn(service as any, "generateOtp").mockReturnValue(mockOtp);
+      // Mock getRetryText if needed, or rely on its use in error messages
       jest
-        .spyOn(Date, "now")
-        .mockReturnValue(new Date("2025-04-21T00:00:00Z").getTime());
+        .spyOn(service as any, "getRetryText")
+        .mockImplementation(
+          (cooldown, now) =>
+            `Retry in ${Math.ceil(
+              ((cooldown as Date).getTime() - (now as Date).getTime()) / 60000
+            )} minute(s).`
+        );
     });
 
-    afterEach(() => {
-      jest.restoreAllMocks();
-    });
-
-    it("should create a new OTP and send email if no existing OTP", async () => {
-      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
-      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue(null);
-      (prisma.qrCodeOTP.create as jest.Mock).mockResolvedValue({
-        qrCodeId: qrId,
-        otp: "123456",
-        expiry: new Date(now.getTime() + 8 * 60 * 1000),
-        attemptCount: 0,
-        cooldown: now,
-      });
-
-      const result = await service.requestQrCodeOTP(qrId);
-
+    it("should throw error if QR code not found", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
+        new BadRequestException("This QR code isn't for OTP requests.")
+      );
       expect(prisma.qrCode.findUnique).toHaveBeenCalledWith({
         where: { id: qrId },
         include: { document: true },
       });
-      expect(prisma.qrCodeOTP.create).toHaveBeenCalled();
-      expect(email.sendPrivateAccessEmail).toHaveBeenCalledWith(
-        fakeQrCode.owner,
-        expect.any(String),
-        fakeQrCode.document.documentName
-      );
-      expect(result).toEqual({
-        owner: fakeQrCode.owner,
-        document: fakeQrCode.document.documentName,
-      });
     });
 
-    it("should throw if QR code is not found or inactive or public", async () => {
-      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(null);
-
-      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
-        "This QR code isn't for OTP requests."
-      );
-
+    it("should throw error if QR code is not active", async () => {
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue({
-        ...fakeQrCode,
+        ...mockQrCode,
         isActive: false,
       });
       await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
-        "This QR code isn't for OTP requests."
+        new BadRequestException("This QR code isn't for OTP requests.")
       );
+    });
 
+    it("should throw error if QR code is not private", async () => {
       (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue({
-        ...fakeQrCode,
+        ...mockQrCode,
         isPrivate: false,
       });
       await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
-        "This QR code isn't for OTP requests."
+        new BadRequestException("This QR code isn't for OTP requests.")
       );
     });
 
-    it("should throw if existing OTP is expired", async () => {
-      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
-      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue({
-        expiry: new Date(now.getTime() - 10000), // expired
-        cooldown: new Date(now.getTime() - 10000),
-      });
-
-      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
-        "OTP expired. Please request a new one."
-      );
-    });
-
-    it("should throw if existing OTP is still in cooldown", async () => {
-      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
-      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue({
-        expiry: new Date(now.getTime() + 10000), // not expired
-        cooldown: new Date(now.getTime() + 10 * 60 * 1000), // still cooling down
-      });
-
-      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
-        /Retry in \d+ min\(s\)\./
-      );
-    });
-
-    it("should reuse existing valid OTP and send email", async () => {
-      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(fakeQrCode);
-      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue({
-        otp: "654321",
-        expiry: new Date(now.getTime() + 10 * 60 * 1000), // still valid
-        cooldown: new Date(now.getTime() - 10000), // cooldown already passed
+    it("should create new OTP record if none exists", async () => {
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(mockQrCode);
+      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.qrCodeOTP.create as jest.Mock).mockResolvedValue({
+        id: "otp-id-1",
+        qrCodeId: qrId,
+        otp: mockOtp,
+        /* other fields */
       });
 
       const result = await service.requestQrCodeOTP(qrId);
 
+      expect(prisma.qrCodeOTP.create).toHaveBeenCalledWith({
+        data: {
+          qrCodeId: qrId,
+          otp: mockOtp,
+          expiry: expect.any(Date), // Check it's a date
+          attemptCount: 0,
+          cooldown: expect.any(Date), // Check it's a date
+        },
+      });
       expect(email.sendPrivateAccessEmail).toHaveBeenCalledWith(
-        fakeQrCode.owner,
-        expect.any(String),
-        fakeQrCode.document.documentName
+        mockQrCode.owner,
+        mockOtp,
+        mockQrCode.document.documentName
       );
       expect(result).toEqual({
-        owner: fakeQrCode.owner,
-        document: fakeQrCode.document.documentName,
+        owner: mockQrCode.owner,
+        document: mockQrCode.document.documentName,
       });
+    });
+
+    it("should update OTP record if exists and not on cooldown", async () => {
+      const existingOtp = {
+        id: "otp-id-2",
+        qrCodeId: qrId,
+        otp: "111111",
+        expiry: new Date(Date.now() - 10000), // Expired
+        attemptCount: 1,
+        cooldown: new Date(Date.now() - 10000), // Cooldown finished
+      };
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(mockQrCode);
+      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue(existingOtp);
+
+      const result = await service.requestQrCodeOTP(qrId);
+
+      expect(prisma.qrCodeOTP.update).toHaveBeenCalledWith({
+        where: { qrCodeId: qrId },
+        data: {
+          otp: mockOtp,
+          expiry: expect.any(Date), // Check expiry is updated
+        },
+      });
+      expect(prisma.qrCodeOTP.create).not.toHaveBeenCalled();
+      expect(email.sendPrivateAccessEmail).toHaveBeenCalledWith(
+        mockQrCode.owner,
+        mockOtp,
+        mockQrCode.document.documentName
+      );
+      expect(result).toEqual({
+        owner: mockQrCode.owner,
+        document: mockQrCode.document.documentName,
+      });
+    });
+
+    it("should throw error if on cooldown", async () => {
+      const cooldownTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes cooldown
+      const existingOtp = {
+        id: "otp-id-3",
+        qrCodeId: qrId,
+        otp: "222222",
+        expiry: new Date(Date.now() - 10000),
+        attemptCount: 0,
+        cooldown: cooldownTime,
+      };
+      (prisma.qrCode.findUnique as jest.Mock).mockResolvedValue(mockQrCode);
+      (prisma.qrCodeOTP.findUnique as jest.Mock).mockResolvedValue(existingOtp);
+
+      await expect(service.requestQrCodeOTP(qrId)).rejects.toThrow(
+        new BadRequestException("Retry in 5 minute(s).") // Message from getRetryText mock
+      );
+      expect(prisma.qrCodeOTP.update).not.toHaveBeenCalled();
+      expect(prisma.qrCodeOTP.create).not.toHaveBeenCalled();
+      expect(email.sendPrivateAccessEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("validateQrCodeOTP", () => {
+    const qrId = "valid-private-qr-id";
+    const validOtp = "123456";
+    const mockQrCode = { id: qrId /* other qr fields */ }; // Assuming qrCode obj needed
+    const baseQrOtp = {
+      id: "otp-id-base",
+      qrCodeId: qrId,
+      otp: validOtp,
+      expiry: new Date(Date.now() + 5 * 60 * 1000), // Expires in 5 mins
+      attemptCount: 0,
+      cooldown: new Date(Date.now() - 60 * 1000), // Cooldown finished
+      qrCode: mockQrCode,
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      // Mock the transaction to just execute the callback with the mocked prisma
+      prisma.$transaction = jest.fn().mockImplementation(async (callback) => {
+        return await callback(prisma);
+      });
+      // Mock getRetryText again for this context
+      jest
+        .spyOn(service as any, "getRetryText")
+        .mockImplementation(
+          (cooldown, now) =>
+            `Retry in ${Math.ceil(
+              ((cooldown as Date).getTime() - (now as Date).getTime()) / 60000
+            )} minute(s).`
+        );
+    });
+
+    it("should throw error if OTP record not found", async () => {
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockRejectedValue(
+        new Error("Not found")
+      ); // Simulate Prisma throwing
+      await expect(service.validateQrCodeOTP(qrId, validOtp)).rejects.toThrow(
+        "Not found"
+      );
+      expect(prisma.qrCodeOTP.update).not.toHaveBeenCalled();
+    });
+
+    it("should throw error if on cooldown", async () => {
+      const cooldownTime = new Date(Date.now() + 10 * 60 * 1000); // 10 mins cooldown
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...baseQrOtp,
+        cooldown: cooldownTime,
+      });
+      await expect(service.validateQrCodeOTP(qrId, validOtp)).rejects.toThrow(
+        new BadRequestException("Retry in 10 minute(s).")
+      );
+      expect(prisma.qrCodeOTP.update).not.toHaveBeenCalled();
+    });
+
+    it("should throw error if OTP expired", async () => {
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...baseQrOtp,
+        expiry: new Date(Date.now() - 1000), // Expired 1 second ago
+      });
+      await expect(service.validateQrCodeOTP(qrId, validOtp)).rejects.toThrow(
+        new BadRequestException("OTP expired. Please request a new one.")
+      );
+      expect(prisma.qrCodeOTP.update).not.toHaveBeenCalled();
+    });
+
+    it("should throw error and increment attempts on invalid OTP (1st attempt)", async () => {
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...baseQrOtp,
+        attemptCount: 0,
+      });
+      (prisma.qrCodeOTP.update as jest.Mock).mockResolvedValue({}); // Mock update success
+
+      await expect(service.validateQrCodeOTP(qrId, "invalid")).rejects.toThrow(
+        new BadRequestException("Invalid OTP.")
+      );
+
+      expect(prisma.qrCodeOTP.update).toHaveBeenCalledWith({
+        where: { qrCodeId: qrId },
+        data: {
+          attemptCount: 1, // Incremented
+        },
+      });
+    });
+
+    it("should throw error and increment attempts on invalid OTP (3rd attempt)", async () => {
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...baseQrOtp,
+        attemptCount: 2, // Currently 2 attempts
+      });
+      (prisma.qrCodeOTP.update as jest.Mock).mockResolvedValue({});
+
+      await expect(service.validateQrCodeOTP(qrId, "invalid")).rejects.toThrow(
+        new BadRequestException("Invalid OTP.")
+      );
+
+      expect(prisma.qrCodeOTP.update).toHaveBeenCalledWith({
+        where: { qrCodeId: qrId },
+        data: {
+          attemptCount: 3, // Incremented
+        },
+      });
+    });
+
+    it("should throw error, reset attempts, and set cooldown on invalid OTP (4th attempt)", async () => {
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...baseQrOtp,
+        attemptCount: 3, // Currently 3 attempts
+      });
+      (prisma.qrCodeOTP.update as jest.Mock).mockResolvedValue({});
+
+      await expect(service.validateQrCodeOTP(qrId, "invalid")).rejects.toThrow(
+        new BadRequestException("Invalid OTP.")
+      );
+
+      expect(prisma.qrCodeOTP.update).toHaveBeenCalledWith({
+        where: { qrCodeId: qrId },
+        data: {
+          attemptCount: 0, // Reset
+          cooldown: expect.any(Date), // Cooldown set (check if roughly 1 hour ahead)
+        },
+      });
+      // Optional: Check cooldown time more precisely if needed
+      const updateCallArgs = (prisma.qrCodeOTP.update as jest.Mock).mock
+        .calls[0][0];
+      const expectedCooldownMin = new Date(Date.now() + 59 * 60 * 1000);
+      const expectedCooldownMax = new Date(Date.now() + 61 * 60 * 1000);
+      expect(updateCallArgs.data.cooldown.getTime()).toBeGreaterThanOrEqual(
+        expectedCooldownMin.getTime()
+      );
+      expect(updateCallArgs.data.cooldown.getTime()).toBeLessThanOrEqual(
+        expectedCooldownMax.getTime()
+      );
+    });
+
+    it("should return qrCode, reset attempts, and update expiry on valid OTP", async () => {
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...baseQrOtp,
+        attemptCount: 2, // Had previous attempts
+      });
+      (prisma.qrCodeOTP.update as jest.Mock).mockResolvedValue({});
+
+      const result = await service.validateQrCodeOTP(qrId, validOtp);
+
+      expect(prisma.qrCodeOTP.update).toHaveBeenCalledWith({
+        where: { qrCodeId: qrId },
+        data: {
+          attemptCount: 0, // Reset on success
+          expiry: expect.any(Date), // Set expiry to now
+        },
+      });
+      // Check expiry is set to roughly 'now'
+      const updateCallArgs = (prisma.qrCodeOTP.update as jest.Mock).mock
+        .calls[0][0];
+      expect(updateCallArgs.data.expiry.getTime()).toBeLessThanOrEqual(
+        Date.now()
+      );
+      expect(updateCallArgs.data.expiry.getTime()).toBeGreaterThanOrEqual(
+        Date.now() - 5000
+      ); // Allow 5s tolerance
+
+      expect(result).toEqual(mockQrCode); // Should return the nested qrCode object
+    });
+
+    it("should validate OTP case-insensitively", async () => {
+      (prisma.qrCodeOTP.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+        ...baseQrOtp,
+        otp: "AbCdEf", // Stored OTP
+      });
+      (prisma.qrCodeOTP.update as jest.Mock).mockResolvedValue({});
+
+      // Validate with different case
+      const result = await service.validateQrCodeOTP(qrId, "aBcDeF");
+
+      expect(prisma.qrCodeOTP.update).toHaveBeenCalledWith({
+        where: { qrCodeId: qrId },
+        data: {
+          attemptCount: 0,
+          expiry: expect.any(Date),
+        },
+      });
+      expect(result).toEqual(mockQrCode);
     });
   });
 });
