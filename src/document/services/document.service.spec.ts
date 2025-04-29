@@ -27,6 +27,7 @@ describe("DocumentService", () => {
     email = {
       sendOwnershipTransferEmail: jest.fn(),
       sendPrivateAccessEmail: jest.fn(),
+      sendReverseOwnershipEmails: jest.fn(),
     } as any;
     config = { get: jest.fn() } as any;
     const posthog = { captureEvent: jest.fn() } as any;
@@ -959,7 +960,7 @@ describe("DocumentService", () => {
       service = new DocumentService(
         null as any, // s3Storage
         repo,
-        null as any, // emailService
+        email,
         null as any, // config
         null as any, // posthog
         prisma,
@@ -1031,7 +1032,11 @@ describe("DocumentService", () => {
         documentID: documentId,
         qrCode: qrCodes,
       } as any);
-      repo.changeOwnership.mockResolvedValue(null as any);
+      repo.changeOwnership.mockResolvedValue({
+        privateId: "new-qr-private",
+        publicId: "new-qr-public",
+        documentId: "new-document-id",
+      });
       const admin = { id: "admin-123" };
       (prisma.user.findFirst as jest.Mock).mockResolvedValue(admin);
 
@@ -1071,7 +1076,7 @@ describe("DocumentService", () => {
         {} as any, // config
         {} as any, // posthog
         {} as any, // prisma
-        {} as any  // auditLog
+        {} as any // auditLog
       );
     });
 
