@@ -14,7 +14,7 @@ import { ConfigModule } from "@nestjs/config";
 import { PrometheusModule } from "@willsoto/nestjs-prometheus";
 import { AuditLogModule } from "./auditLog/auditLog.module";
 import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
-import { RolesGuard } from "./auth/roles.guard";
+import { RolesGuard } from "./auth/guards/roles.guard";
 import { AdminSeederService } from "./auth/adminseeder.service";
 
 @Module({

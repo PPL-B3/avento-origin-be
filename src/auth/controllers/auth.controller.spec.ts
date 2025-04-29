@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AuthController } from "./auth.controller";
-import { AuthService } from "./auth.service";
-import { AuthDto } from "./dto";
+import { AuthService } from "../services/auth.service";
+import { AuthDto } from "../dto";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { ForbiddenException } from "@nestjs/common";
 import { Role } from "@prisma/client";

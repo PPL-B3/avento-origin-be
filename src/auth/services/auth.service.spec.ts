@@ -1,12 +1,12 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AuthService } from "./auth.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { AuthDto } from "./dto";
+import { PrismaService } from "../../prisma/prisma.service";
+import { AuthDto } from "../dto";
 import * as argon from "argon2";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { JwtService } from "./jwt/jwt.service";
-import { AuditLogService } from "../auditLog/auditLog.service";
+import { JwtService } from "../jwt/jwt.service";
+import { AuditLogService } from "../../auditLog/auditLog.service";
 import { Role } from "@prisma/client";
 
 describe("AuthService", () => {

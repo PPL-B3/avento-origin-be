@@ -25,9 +25,9 @@ import {
 import { Request } from "express";
 import { AccessQrCodeDTO } from "../dto/access-qr-code.dto";
 import { ReverseOwnershipDTO } from "../dto/reverse-ownership.dto";
-import { Roles } from "../../auth/roles.decorator";
+import { Roles } from "../../auth/guards/roles.decorator";
 import { JwtAuthMiddleware } from "../../auth/jwt/middleware/jwt-auth.middleware";
-import { RolesGuard } from "../../auth/roles.guard";
+import { RolesGuard } from "../../auth/guards/roles.guard";
 
 @Controller("documents")
 export class DocumentController {
