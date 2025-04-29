@@ -352,7 +352,10 @@ export class DocumentService {
   async getDocument(documentId: string) {
     const document = await this.documentRepo.findDocumentById(documentId);
     const currentOwner = this.getCurrentOwner(document);
-    const ownershipMap = new Map<string, { owner: string; generatedDate: Date }>();
+    const ownershipMap = new Map<
+      string,
+      { owner: string; generatedDate: Date }
+    >();
     for (const code of document.qrCode) {
       const key = code.generatedDate.toISOString();
       if (!ownershipMap.has(key)) {
@@ -363,7 +366,7 @@ export class DocumentService {
       }
     }
     const ownershipHistory = Array.from(ownershipMap.values()).sort(
-      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime(),
+      (a, b) => a.generatedDate.getTime() - b.generatedDate.getTime()
     );
     return {
       documentId: document.documentID,
@@ -384,10 +387,14 @@ export class DocumentService {
       if ((index + 1) * 2 > qrCodes.length)
         throw new BadRequestException("Index out of range.");
 
-      const prevOwner = qrCodes[index * 2].owner;
-      const activeOwner = qrCodes[qrCodes.length - 2].owner;
+      const gainingOwner = qrCodes[index * 2].owner;
+      const losingOwner = qrCodes[qrCodes.length - 2].owner;
 
-      await this.documentRepo.changeOwnership(tx, prevOwner, documentId);
+      const qrCodeInfo = await this.documentRepo.changeOwnership(
+        tx,
+        gainingOwner,
+        documentId
+      );
 
       const admin = await this.prisma.user.findFirst({
         orderBy: { createdAt: "asc" },
@@ -397,9 +404,17 @@ export class DocumentService {
       await this.auditLogService.addAuditLog({
         eventType: "REVERSE_OWNERSHIP",
         userID: admin!.id,
-        details: `Ownership reversed from ${activeOwner} to ${prevOwner}.`,
+        details: `Ownership reversed from ${losingOwner} to ${gainingOwner}.`,
         documentID: documentId,
       });
+
+      await this.emailService.sendReverseOwnershipEmails(
+        gainingOwner,
+        losingOwner,
+        document.documentName,
+        qrCodeInfo.publicId,
+        qrCodeInfo.privateId
+      );
     });
   }
 }
