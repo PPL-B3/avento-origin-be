@@ -132,4 +132,81 @@ describe("EmailService", () => {
       ).rejects.toThrow("SMTP failure");
     });
   });
+
+  describe("sendReverseOwnershipEmails", () => {
+    const gainingOwner = "newowner@example.com";
+    const losingOwner = "oldowner@example.com";
+    const documentName = "MyFile.pdf";
+    const publicQrCodeId = "http://public-qr-code-link";
+    const privateQrCodeId = "http://private-qr-code-link";
+
+    it("should send two emails with correct content", async () => {
+      await emailService.sendReverseOwnershipEmails(
+        gainingOwner,
+        losingOwner,
+        documentName,
+        publicQrCodeId,
+        privateQrCodeId
+      );
+
+      // Make sure two emails were sent
+      expect(sendMailMock).toHaveBeenCalledTimes(2);
+
+      const [firstEmail, secondEmail] = sendMailMock.mock.calls.map(
+        (call) => call[0]
+      );
+
+      // First email: to gainingOwner
+      expect(firstEmail.from).toBe(`"Avento Origin" <test@gmail.com>`);
+      expect(firstEmail.to).toBe(gainingOwner);
+      expect(firstEmail.subject).toBe("Pemberian Kepemilikan Dokumen");
+      expect(firstEmail.html).toContain(`<strong>${documentName}</strong>`);
+      expect(firstEmail.html).toContain(publicQrCodeId);
+      expect(firstEmail.html).toContain(privateQrCodeId);
+
+      // Second email: to losingOwner
+      expect(secondEmail.from).toBe(`"Avento Origin" <test@gmail.com>`);
+      expect(secondEmail.to).toBe(losingOwner);
+      expect(secondEmail.subject).toBe("Pencabutan Kepemilikan Dokumen");
+      expect(secondEmail.html).toContain(`<strong>${documentName}</strong>`);
+      expect(secondEmail.html).toContain("Kepemilikan Anda atas dokumen");
+    });
+
+    it("should propagate errors if first email fails", async () => {
+      sendMailMock.mockRejectedValueOnce(new Error("First email failed"));
+
+      await expect(
+        emailService.sendReverseOwnershipEmails(
+          gainingOwner,
+          losingOwner,
+          documentName,
+          publicQrCodeId,
+          privateQrCodeId
+        )
+      ).rejects.toThrow("First email failed");
+
+      // Should not attempt to send the second email if first fails
+      expect(sendMailMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("should propagate errors if second email fails", async () => {
+      // First email succeeds, second fails
+      sendMailMock
+        .mockResolvedValueOnce("ok")
+        .mockRejectedValueOnce(new Error("Second email failed"));
+
+      await expect(
+        emailService.sendReverseOwnershipEmails(
+          gainingOwner,
+          losingOwner,
+          documentName,
+          publicQrCodeId,
+          privateQrCodeId
+        )
+      ).rejects.toThrow("Second email failed");
+
+      // Should attempt both sends
+      expect(sendMailMock).toHaveBeenCalledTimes(2);
+    });
+  });
 });
