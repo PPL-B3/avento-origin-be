@@ -4,6 +4,50 @@ import * as argon2 from "argon2";
 const prisma = new PrismaClient();
 
 async function main() {
+  // Seed Users
+  const hashedPassword = await argon2.hash("password123");
+  const adminPassword = await argon2.hash("adminPassword123");
+  
+  const users = await prisma.user.createMany({
+    data: [
+      {
+        id: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+        email: "user1@example.com",
+        password: hashedPassword,
+        role: "USER",
+        lastLogout: BigInt(new Date("2025-05-01 15:50:21.56").getTime())
+      },
+      {
+        id: "b25958e1-bd30-411f-824f-afaa203e797c",
+        email: "admin@avento.com",
+        password: adminPassword,
+        role: "ADMIN",
+        lastLogout: BigInt(new Date("2025-05-01 15:50:55.684").getTime())
+      },
+      {
+        id: "c43e823f-6a12-49ed-9532-aacd5628ba2f",
+        email: "another.user2@another.example.com",
+        password: hashedPassword,
+        role: "USER",
+        lastLogout: BigInt(Date.now())
+      },
+      {
+        id: "e59a7d12-9b3f-48c7-a11d-5fa8e48a35b9",
+        email: "yet.another.user3@another.example.com",
+        password: hashedPassword,
+        role: "USER",
+        lastLogout: BigInt(Date.now())
+      },
+      {
+        id: "f3a852d4-1cd2-4abc-9462-9f6782b4f8e1",
+        email: "user4@example.com",
+        password: hashedPassword,
+        role: "USER",
+        lastLogout: BigInt(Date.now())
+      }
+    ],
+    skipDuplicates: true,
+  });
 
   // Seed Document table
   const documents = await prisma.document.createMany({
@@ -123,6 +167,7 @@ async function main() {
     skipDuplicates: true,
   });
 
+  console.log(`Seeded: ${users.count} users`);
   console.log(`Seeded: ${documents.count} documents`);
   console.log(`Seeded: ${qrcodes.count} QR codes`);
   console.log(`Seeded: ${qrcodeOtps.count} QR code OTPs`);
