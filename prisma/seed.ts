@@ -9,7 +9,6 @@ const environment = process.env.NODE_ENV ?? "development";
 async function main() {
   // Load environment-specific seed data
   const seedDataPath = path.join(__dirname, `seed-data/${environment}`);
-  const defaultDataPath = path.join(__dirname, "seed-data/default");
 
   // Check if environment-specific seed data directory exists
   if (!fs.existsSync(seedDataPath)) {
@@ -17,14 +16,6 @@ async function main() {
   } else {
     console.log(`Running seed for ${environment} environment`);
     await seedFromEnvironment(seedDataPath);
-  }
-
-  // Check if default seed data directory exists
-  if (!fs.existsSync(defaultDataPath)) {
-    console.warn(`No default seed data found`);
-  } else {
-    console.log(`Running default seed data`);
-    await seedFromEnvironment(defaultDataPath);
   }
 
   // Run admin seeder for production environment

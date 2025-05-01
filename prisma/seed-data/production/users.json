@@ -8,14 +8,14 @@
   },
   {
     "id": "c43e823f-6a12-49ed-9532-aacd5628ba2f",
-    "email": "another.user2@another.example.com",
+    "email": "user2@example.com",
     "password": "password123",
     "role": "USER",
     "lastLogout": "2025-05-01 15:49:32.579"
   },
   {
     "id": "e59a7d12-9b3f-48c7-a11d-5fa8e48a35b9",
-    "email": "yet.another.user3@another.example.com",
+    "email": "user3@example.com",
     "password": "password123",
     "role": "USER",
     "lastLogout": "2025-05-01 15:48:44.994"
