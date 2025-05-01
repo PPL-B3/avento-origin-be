@@ -4,6 +4,61 @@ import * as argon2 from "argon2";
 const prisma = new PrismaClient();
 
 async function main() {
+  // Seed QR Codes
+  const qrcodes = await prisma.qrCode.createMany({
+    data: [
+      {
+        id: "6b6493f2-dbbc-4386-968e-60f974369159",
+        owner: "user1@example.com",
+        isPrivate: false,
+        isActive: true,
+        generatedDate: new Date("2025-05-01 15:47:30.361"),
+        documentId: "a7f9c8de-54ed-453b-9732-8951371b84cb",
+      },
+      {
+        id: "f869f321-a970-4d5c-99aa-07d3e35cbefe",
+        owner: "user1@example.com",
+        isPrivate: true,
+        isActive: true,
+        generatedDate: new Date("2025-05-01 15:47:30.361"),
+        documentId: "a7f9c8de-54ed-453b-9732-8951371b84cb",
+      },
+      {
+        id: "13b5b18f-db4e-4b6b-a015-41e6dcfde4b6",
+        owner: "user1@example.com",
+        isPrivate: false,
+        isActive: false,
+        generatedDate: new Date("2025-05-01 15:46:21.434"),
+        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
+      },
+      {
+        id: "508857e4-6b23-436d-8a6b-bcfd088a11f1",
+        owner: "user1@example.com",
+        isPrivate: true,
+        isActive: false,
+        generatedDate: new Date("2025-05-01 15:46:21.434"),
+        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
+      },
+      {
+        id: "58743324-8e3a-44bc-858d-21f44e184cd5",
+        owner: "another.user2@another.example.com",
+        isPrivate: false,
+        isActive: true,
+        generatedDate: new Date("2025-05-01 15:49:32.571"),
+        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
+      },
+      {
+        id: "72d972af-8f9a-43da-be0e-a47105df17cf",
+        owner: "another.user2@another.example.com",
+        isPrivate: true,
+        isActive: true,
+        generatedDate: new Date("2025-05-01 15:49:32.571"),
+        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
+      },
+    ],
+    skipDuplicates: true,
+  });
+
   // Seed QR Code OTPs
   const qrcodeOtps = await prisma.qrCodeOTP.createMany({
     data: [
@@ -46,6 +101,7 @@ async function main() {
     skipDuplicates: true,
   });
 
+  console.log(`Seeded: ${qrcodes.count} QR codes`);
   console.log(`Seeded: ${qrcodeOtps.count} QR code OTPs`);
 }
 
