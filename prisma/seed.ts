@@ -14,6 +14,7 @@ async function main() {
           "Integer sed posuere ante. Praesent nunc dui, ultrices et mi at, pellentesque vehicula enim.",
       },
     ],
+    skipDuplicates: true,
   });
 }
 
