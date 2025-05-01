@@ -1,252 +1,196 @@
 import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
+import * as fs from "fs";
+import * as path from "path";
 
 const prisma = new PrismaClient();
+const environment = process.env.NODE_ENV ?? "development";
 
 async function main() {
-  // Seed Users
-  const hashedPassword = await argon2.hash("password123");
-  const adminPassword = await argon2.hash("adminPassword123");
-  
+  // Load environment-specific seed data
+  const seedDataPath = path.join(__dirname, `seed-data/${environment}`);
+  const defaultDataPath = path.join(__dirname, "seed-data/default");
+
+  // Check if environment-specific seed data directory exists
+  if (!fs.existsSync(seedDataPath)) {
+    console.warn(`No seed data found for ${environment} environment`);
+  } else {
+    console.log(`Running seed for ${environment} environment`);
+    await seedFromEnvironment(seedDataPath);
+  }
+
+  // Check if default seed data directory exists
+  if (!fs.existsSync(defaultDataPath)) {
+    console.warn(`No default seed data found`);
+  } else {
+    console.log(`Running default seed data`);
+    await seedFromEnvironment(defaultDataPath);
+  }
+
+  // Run admin seeder for production environment
+  if (environment === "production") {
+    await seedAdminFromEnv();
+  }
+}
+
+async function seedAdminFromEnv() {
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+
+  if (!email || !password) {
+    console.warn(
+      "ADMIN_EMAIL or ADMIN_PASSWORD not set, skipping admin seeding"
+    );
+    return;
+  }
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    console.log(`Admin user already exists: ${email}`);
+    return;
+  }
+
+  const hash = await argon2.hash(password);
+  await prisma.user.create({
+    data: {
+      email,
+      password: hash,
+      role: "ADMIN",
+      lastLogout: BigInt(Date.now()),
+    },
+  });
+  console.log(`✅ Created admin user from environment variables: ${email}`);
+}
+
+async function seedFromEnvironment(seedDataPath: string) {
+  try {
+    await seedUsers(seedDataPath);
+    await seedDocuments(seedDataPath);
+    await seedQRCodes(seedDataPath);
+    await seedQRCodeOTPs(seedDataPath);
+    await seedAuditLogs(seedDataPath);
+    await seedMessages(seedDataPath);
+  } catch (error) {
+    console.error("Error seeding from environment:", error);
+    throw error;
+  }
+}
+
+async function seedUsers(seedDataPath: string) {
+  const filePath = path.join(seedDataPath, "users.json");
+  if (!fs.existsSync(filePath)) return;
+
+  const usersData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+  // Hash passwords before inserting
+  for (const user of usersData) {
+    if (user.password) {
+      user.password = await argon2.hash(user.password);
+    }
+    if (user.lastLogout && typeof user.lastLogout === "string") {
+      user.lastLogout = BigInt(new Date(user.lastLogout).getTime());
+    }
+  }
+
   const users = await prisma.user.createMany({
-    data: [
-      {
-        id: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        email: "user1@example.com",
-        password: hashedPassword,
-        role: "USER",
-        lastLogout: BigInt(new Date("2025-05-01 15:50:21.56").getTime())
-      },
-      {
-        id: "b25958e1-bd30-411f-824f-afaa203e797c",
-        email: "admin@avento.com",
-        password: adminPassword,
-        role: "ADMIN",
-        lastLogout: BigInt(new Date("2025-05-01 15:50:55.684").getTime())
-      },
-      {
-        id: "c43e823f-6a12-49ed-9532-aacd5628ba2f",
-        email: "another.user2@another.example.com",
-        password: hashedPassword,
-        role: "USER",
-        lastLogout: BigInt(Date.now())
-      },
-      {
-        id: "e59a7d12-9b3f-48c7-a11d-5fa8e48a35b9",
-        email: "yet.another.user3@another.example.com",
-        password: hashedPassword,
-        role: "USER",
-        lastLogout: BigInt(Date.now())
-      },
-      {
-        id: "f3a852d4-1cd2-4abc-9462-9f6782b4f8e1",
-        email: "user4@example.com",
-        password: hashedPassword,
-        role: "USER",
-        lastLogout: BigInt(Date.now())
-      }
-    ],
+    data: usersData,
     skipDuplicates: true,
   });
-
-  // Seed Document table
-  const documents = await prisma.document.createMany({
-    data: [
-      {
-        documentID: "a7f9c8de-54ed-453b-9732-8951371b84cb",
-        documentName: "3_popular_tokenizers.pdf",
-        filePath: "https://avento.sgp1.digitaloceanspaces.com/mahartha.gemilang%40gmail.com_3_popular_tokenizers.pdf_1746114446182.pdf",
-        uploadDate: new Date("2025-05-01 15:47:30.359"),
-        publisher: "user1@example.com",
-      },
-      {
-        documentID: "a891297c-1049-41bf-9862-86fd25c77510",
-        documentName: "index_compression.pdf",
-        filePath: "https://avento.sgp1.digitaloceanspaces.com/mahartha.gemilang%40gmail.com_index_compression.pdf_1746114379608.pdf",
-        uploadDate: new Date("2025-05-01 15:46:21.418"),
-        publisher: "user1@example.com",
-      },
-    ],
-    skipDuplicates: true,
-  });
-
-  // Seed QR Codes
-  const qrcodes = await prisma.qrCode.createMany({
-    data: [
-      {
-        id: "6b6493f2-dbbc-4386-968e-60f974369159",
-        owner: "user1@example.com",
-        isPrivate: false,
-        isActive: true,
-        generatedDate: new Date("2025-05-01 15:47:30.361"),
-        documentId: "a7f9c8de-54ed-453b-9732-8951371b84cb",
-      },
-      {
-        id: "f869f321-a970-4d5c-99aa-07d3e35cbefe",
-        owner: "user1@example.com",
-        isPrivate: true,
-        isActive: true,
-        generatedDate: new Date("2025-05-01 15:47:30.361"),
-        documentId: "a7f9c8de-54ed-453b-9732-8951371b84cb",
-      },
-      {
-        id: "13b5b18f-db4e-4b6b-a015-41e6dcfde4b6",
-        owner: "user1@example.com",
-        isPrivate: false,
-        isActive: false,
-        generatedDate: new Date("2025-05-01 15:46:21.434"),
-        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
-      },
-      {
-        id: "508857e4-6b23-436d-8a6b-bcfd088a11f1",
-        owner: "user1@example.com",
-        isPrivate: true,
-        isActive: false,
-        generatedDate: new Date("2025-05-01 15:46:21.434"),
-        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
-      },
-      {
-        id: "58743324-8e3a-44bc-858d-21f44e184cd5",
-        owner: "another.user2@another.example.com",
-        isPrivate: false,
-        isActive: true,
-        generatedDate: new Date("2025-05-01 15:49:32.571"),
-        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
-      },
-      {
-        id: "72d972af-8f9a-43da-be0e-a47105df17cf",
-        owner: "another.user2@another.example.com",
-        isPrivate: true,
-        isActive: true,
-        generatedDate: new Date("2025-05-01 15:49:32.571"),
-        documentId: "a891297c-1049-41bf-9862-86fd25c77510",
-      },
-    ],
-    skipDuplicates: true,
-  });
-
-  // Seed QR Code OTPs
-  const qrcodeOtps = await prisma.qrCodeOTP.createMany({
-    data: [
-      {
-        id: "ef0ca680-7988-4cec-b92b-a8b1e409d490",
-        qrCodeId: "508857e4-6b23-436d-8a6b-bcfd088a11f1",
-        otp: "457596",
-        expiry: new Date("2025-05-01 15:55:15.771"),
-        attemptCount: 0,
-        cooldown: new Date("2025-05-01 15:46:48.181"),
-        createdAt: new Date("2025-05-01 15:46:48.183"),
-        updatedAt: new Date("2025-05-01 15:47:15.772"),
-      },
-      {
-        id: "d761d58a-081e-419d-a2a8-b41b1ce9f9df",
-        qrCodeId: "72d972af-8f9a-43da-be0e-a47105df17cf",
-        otp: "378133",
-        expiry: new Date("2025-05-01 15:56:24.629"),
-        attemptCount: 0,
-        cooldown: new Date("2025-05-01 15:49:41.901"),
-        createdAt: new Date("2025-05-01 15:49:41.902"),
-        updatedAt: new Date("2025-05-01 15:56:24.63"),
-      },
-    ],
-    skipDuplicates: true,
-  });
-
-  // Seed Audit Logs
-  const auditLogs = await prisma.auditLog.createMany({
-    data: [
-      {
-        logID: "62f7caa8-8e29-41fb-b65a-5e47a4218e3b",
-        eventType: "LOGIN",
-        timestamp: new Date("2025-05-01 15:42:00.068"),
-        userID: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        details: "User with email user1@example.com logged in.",
-      },
-      {
-        logID: "d6533f8a-3019-4289-818e-2464135f45b3",
-        eventType: "LOGIN",
-        timestamp: new Date("2025-05-01 15:45:47.689"),
-        userID: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        details: "User with email user1@example.com logged in.",
-      },
-      {
-        logID: "703f6e9c-ac69-4630-975c-9de101c35c00",
-        eventType: "UPLOAD_DOCUMENT",
-        timestamp: new Date("2025-05-01 15:46:21.461"),
-        userID: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        documentID: "a891297c-1049-41bf-9862-86fd25c77510",
-        details: "Document \"index_compression.pdf\" uploaded.",
-      },
-      {
-        logID: "278d6431-3d90-4b90-bf5c-c8d2995b419c",
-        eventType: "UPLOAD_DOCUMENT",
-        timestamp: new Date("2025-05-01 15:47:30.367"),
-        userID: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        documentID: "a7f9c8de-54ed-453b-9732-8951371b84cb",
-        details: "Document \"3_popular_tokenizers.pdf\" uploaded.",
-      },
-      {
-        logID: "53d15884-1539-4cb8-8f01-5d5d4bd17f48",
-        eventType: "TRANSFER_OWNERSHIP",
-        timestamp: new Date("2025-05-01 15:48:44.994"),
-        userID: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        documentID: "a891297c-1049-41bf-9862-86fd25c77510",
-        details: "Ownership transfer initiated for document \"index_compression.pdf\" to yet.another.user3@another.example.com",
-      },
-      {
-        logID: "05eaaa69-2548-4a58-ae92-863545094a7d",
-        eventType: "TRANSFER_OWNERSHIP",
-        timestamp: new Date("2025-05-01 15:48:57.928"),
-        userID: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        documentID: "a891297c-1049-41bf-9862-86fd25c77510",
-        details: "Ownership transfer initiated for document \"index_compression.pdf\" to another.user2@another.example.com",
-      },
-      {
-        logID: "9d8f3ba4-ff5a-4861-85be-5b004ef5e75d",
-        eventType: "CLAIM_DOCUMENT",
-        timestamp: new Date("2025-05-01 15:49:32.579"),
-        userID: "another.user2@another.example.com",
-        documentID: "a891297c-1049-41bf-9862-86fd25c77510",
-        details: "Document \"index_compression.pdf\" successfully claimed.",
-      },
-      {
-        logID: "49a1417a-ec28-448a-b5dc-422369ca6b26",
-        eventType: "LOGOUT",
-        timestamp: new Date("2025-05-01 15:50:21.56"),
-        userID: "df2f75a8-2839-47f7-b40c-659217f4bc7d",
-        details: "User with email user1@example.com logged out.",
-      },
-      {
-        logID: "0df65499-187a-46d4-ae3b-ca496daf6da8",
-        eventType: "LOGIN",
-        timestamp: new Date("2025-05-01 15:50:55.684"),
-        userID: "b25958e1-bd30-411f-824f-afaa203e797c",
-        details: "User with email admin@avento.com logged in.",
-      },
-    ],
-    skipDuplicates: true,
-  });
-
-  // Keep existing message seed if needed
-  await prisma.message.createMany({
-    data: [
-      { content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit." },
-      {
-        content: "Integer pretium lobortis enim, at accumsan sem egestas vel.",
-      },
-      {
-        content:
-          "Integer sed posuere ante. Praesent nunc dui, ultrices et mi at, pellentesque vehicula enim.",
-      },
-    ],
-    skipDuplicates: true,
-  });
-
   console.log(`Seeded: ${users.count} users`);
+}
+
+async function seedDocuments(seedDataPath: string) {
+  const filePath = path.join(seedDataPath, "documents.json");
+  if (!fs.existsSync(filePath)) return;
+
+  const documentsData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+  // Convert date strings to Date objects
+  for (const doc of documentsData) {
+    if (doc.uploadDate) {
+      doc.uploadDate = new Date(doc.uploadDate);
+    }
+  }
+
+  const documents = await prisma.document.createMany({
+    data: documentsData,
+    skipDuplicates: true,
+  });
   console.log(`Seeded: ${documents.count} documents`);
+}
+
+async function seedQRCodes(seedDataPath: string) {
+  const filePath = path.join(seedDataPath, "qrcodes.json");
+  if (!fs.existsSync(filePath)) return;
+
+  const qrcodesData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+  // Convert date strings to Date objects
+  for (const qrcode of qrcodesData) {
+    if (qrcode.generatedDate) {
+      qrcode.generatedDate = new Date(qrcode.generatedDate);
+    }
+  }
+
+  const qrcodes = await prisma.qrCode.createMany({
+    data: qrcodesData,
+    skipDuplicates: true,
+  });
   console.log(`Seeded: ${qrcodes.count} QR codes`);
+}
+
+async function seedQRCodeOTPs(seedDataPath: string) {
+  const filePath = path.join(seedDataPath, "qrcodeotps.json");
+  if (!fs.existsSync(filePath)) return;
+
+  const qrcodeOtpsData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+  // Convert date strings to Date objects
+  for (const otp of qrcodeOtpsData) {
+    if (otp.expiry) otp.expiry = new Date(otp.expiry);
+    if (otp.cooldown) otp.cooldown = new Date(otp.cooldown);
+    if (otp.createdAt) otp.createdAt = new Date(otp.createdAt);
+    if (otp.updatedAt) otp.updatedAt = new Date(otp.updatedAt);
+  }
+
+  const qrcodeOtps = await prisma.qrCodeOTP.createMany({
+    data: qrcodeOtpsData,
+    skipDuplicates: true,
+  });
   console.log(`Seeded: ${qrcodeOtps.count} QR code OTPs`);
+}
+
+async function seedAuditLogs(seedDataPath: string) {
+  const filePath = path.join(seedDataPath, "auditlogs.json");
+  if (!fs.existsSync(filePath)) return;
+
+  const auditLogsData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+  // Convert date strings to Date objects
+  for (const log of auditLogsData) {
+    if (log.timestamp) {
+      log.timestamp = new Date(log.timestamp);
+    }
+  }
+
+  const auditLogs = await prisma.auditLog.createMany({
+    data: auditLogsData,
+    skipDuplicates: true,
+  });
   console.log(`Seeded: ${auditLogs.count} audit logs`);
+}
+
+async function seedMessages(seedDataPath: string) {
+  const filePath = path.join(seedDataPath, "messages.json");
+  if (!fs.existsSync(filePath)) return;
+
+  const messagesData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+
+  await prisma.message.createMany({
+    data: messagesData,
+    skipDuplicates: true,
+  });
+  console.log(`Seeded: ${messagesData.length} messages`);
 }
 
 main()
