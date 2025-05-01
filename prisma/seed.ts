@@ -4,6 +4,28 @@ import * as argon2 from "argon2";
 const prisma = new PrismaClient();
 
 async function main() {
+
+  // Seed Document table
+  const documents = await prisma.document.createMany({
+    data: [
+      {
+        documentID: "a7f9c8de-54ed-453b-9732-8951371b84cb",
+        documentName: "3_popular_tokenizers.pdf",
+        filePath: "https://avento.sgp1.digitaloceanspaces.com/mahartha.gemilang%40gmail.com_3_popular_tokenizers.pdf_1746114446182.pdf",
+        uploadDate: new Date("2025-05-01 15:47:30.359"),
+        publisher: "user1@example.com",
+      },
+      {
+        documentID: "a891297c-1049-41bf-9862-86fd25c77510",
+        documentName: "index_compression.pdf",
+        filePath: "https://avento.sgp1.digitaloceanspaces.com/mahartha.gemilang%40gmail.com_index_compression.pdf_1746114379608.pdf",
+        uploadDate: new Date("2025-05-01 15:46:21.418"),
+        publisher: "user1@example.com",
+      },
+    ],
+    skipDuplicates: true,
+  });
+
   // Seed QR Codes
   const qrcodes = await prisma.qrCode.createMany({
     data: [
@@ -101,6 +123,7 @@ async function main() {
     skipDuplicates: true,
   });
 
+  console.log(`Seeded: ${documents.count} documents`);
   console.log(`Seeded: ${qrcodes.count} QR codes`);
   console.log(`Seeded: ${qrcodeOtps.count} QR code OTPs`);
 }
