@@ -1,26 +1,37 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
+import * as argon2 from "argon2";
 
 @Injectable()
 export class AdminSeederService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
   ) {}
 
   async onModuleInit() {
-    // Admin seeding functionality has been moved to prisma/seed.ts
-    // and is now only executed in production environment
-    // This service is kept as a placeholder for backward compatibility
-    
-    const environment = this.config.get<string>("NODE_ENV") ?? "development";
-    
-    if (environment !== "production") {
-      console.log("Admin seeding is only performed in production environment");
-      console.log("For local development, use prisma db seed command");
-    } else {
-      console.log("Admin seeding is handled by prisma/seed.ts in production");
+    const email = this.config.get<string>("ADMIN_EMAIL");
+    const password = this.config.get<string>("ADMIN_PASSWORD");
+    if (!email || !password) {
+      console.warn(
+        "ADMIN_EMAIL or ADMIN_PASSWORD not set, skipping admin seeding",
+      );
+      return;
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (!existing) {
+      const hash = await argon2.hash(password);
+      await this.prisma.user.create({
+        data: {
+          email,
+          password: hash,
+          role: "ADMIN",
+          lastLogout: BigInt(Date.now()),
+        },
+      });
+      console.log(`✅ Created initial admin user: ${email}`);
     }
   }
 }
