@@ -15,7 +15,7 @@ import { PasswordPolicy } from "../interfaces/password-policy.interface";
 @Injectable()
 export class AuthService {
   constructor(
-    @Inject("PasswordPolicy") private policy: PasswordPolicy,
+    @Inject("PasswordPolicy") private readonly policy: PasswordPolicy,
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
     private readonly auditLogService: AuditLogService,
