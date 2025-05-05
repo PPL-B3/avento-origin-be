@@ -75,8 +75,8 @@ jobs:
       - name: Upload sourcemaps to Sentry
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: node-nestjs
         run: |
           # Install sentry-cli
           curl -sL https://sentry.io/get-cli/ | bash
