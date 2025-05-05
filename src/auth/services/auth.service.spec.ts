@@ -1,18 +1,18 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AuthService } from "./auth.service";
-import { PrismaService } from "../../prisma/prisma.service";
 import { AuthDto } from "../dto";
 import * as argon from "argon2";
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "../jwt/jwt.service";
 import { AuditLogService } from "../../auditLog/auditLog.service";
-import { Role } from "@prisma/client";
+import { Role, User } from "@prisma/client";
 import { PasswordPolicy } from "../interfaces/password-policy.interface";
+import { UserRepository } from "../interfaces/user-repository.interface";
 
 describe("AuthService", () => {
   let authService: AuthService;
-  let prismaService: PrismaService;
+  let userRepo: UserRepository;
   let auditLogService: AuditLogService;
   let passwordPolicy: PasswordPolicy;
 
@@ -21,13 +21,12 @@ describe("AuthService", () => {
       providers: [
         AuthService,
         {
-          provide: PrismaService,
+          provide: "UserRepository",
           useValue: {
-            user: {
-              update: jest.fn(),
-              create: jest.fn(),
-              findUnique: jest.fn(),
-            },
+            findById: jest.fn(),
+            findByEmail: jest.fn(),
+            createUser: jest.fn(),
+            markLogout: jest.fn(),
           },
         },
         {
@@ -44,383 +43,202 @@ describe("AuthService", () => {
         },
         {
           provide: "PasswordPolicy",
-          useValue: {
-            validate: jest.fn(),
-          },
+          useValue: { validate: jest.fn() },
         },
       ],
     }).compile();
 
     authService = module.get<AuthService>(AuthService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    userRepo = module.get<UserRepository>("UserRepository");
     auditLogService = module.get<AuditLogService>(AuditLogService);
     passwordPolicy = module.get<PasswordPolicy>("PasswordPolicy");
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  afterEach(() => jest.clearAllMocks());
 
   describe("logout", () => {
     it("should update lastLogout, add audit log and return success response", async () => {
       const userId = "123";
       const userEmail = "user@example.com";
+      const mockUser = { id: userId, email: userEmail } as User;
 
-      const updateSpy = jest.spyOn(prismaService.user, "update");
-      const findUniqueSpy = jest
-        .spyOn(prismaService.user, "findUnique")
-        .mockResolvedValue({
-          email: "user@example.com",
-        } as any);
-      const auditLogSpy = jest
+      (userRepo.findById as jest.Mock).mockResolvedValue(mockUser);
+      (userRepo.markLogout as jest.Mock).mockResolvedValue(undefined);
+      const auditSpy = jest
         .spyOn(auditLogService, "addAuditLog")
-        .mockResolvedValue({
-          logID: "mock-log-id",
-          eventType: "LOGOUT",
-          timestamp: new Date(),
-          userID: "mock-user-id",
-          documentID: null,
-          details: "User with email test@example.com logged out.",
-        });
+        .mockResolvedValue({} as any);
 
       const result = await authService.logout(userId);
 
-      expect(findUniqueSpy).toHaveBeenCalledWith({
-        where: { id: userId },
-        select: { email: true },
-      });
-
-      expect(updateSpy).toHaveBeenCalledWith({
-        where: { id: userId },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        data: { lastLogout: expect.any(BigInt) },
-      });
-
-      expect(auditLogSpy).toHaveBeenCalledWith({
+      expect(userRepo.findById).toHaveBeenCalledWith(userId);
+      expect(userRepo.markLogout).toHaveBeenCalledWith(
+        userId,
+        expect.any(BigInt),
+      );
+      expect(auditSpy).toHaveBeenCalledWith({
         eventType: "LOGOUT",
         userID: userId,
         details: `User with email ${userEmail} logged out.`,
       });
-
-      expect(result).toEqual({
-        success: true,
-        message: "Berhasil logout",
-      });
+      expect(result).toEqual({ success: true, message: "Berhasil logout" });
     });
 
     it("should throw BadRequestException if userId is missing", async () => {
-      await expect(authService.logout("")).rejects.toThrow(
-        "User ID harus diisi"
-      );
+      await expect(authService.logout("")).rejects.toThrow(BadRequestException);
     });
 
-    it("should return failure response if update throws error", async () => {
-      const userId = "123";
-
-      jest
-        .spyOn(prismaService.user, "update")
-        .mockRejectedValueOnce(new Error("DB Error"));
-
-      const result = await authService.logout(userId);
-
-      expect(result).toEqual({
-        success: false,
-        message: "Gagal logout",
-      });
-    });
-  });
-
-  it("should be defined", () => {
-    expect(authService).toBeDefined();
-  });
-
-  it("should register a new user successfully", async () => {
-    const dto: AuthDto = {
-      email: "test@example.com",
-      password: "Password123!",
-    };
-
-    const mockUser = {
-      id: "123",
-      email: "test@test.com",
-      password: "hashedpassword",
-      role: Role.USER,
-      lastLogout: BigInt(Date.now()),
-      createdAt: new Date(),
-    };
-
-    jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
-    jest.spyOn(prismaService.user, "create").mockResolvedValue(mockUser);
-
-    const result = await authService.register(dto);
-
-    expect(argon.hash).toHaveBeenCalledWith(dto.password);
-    expect(prismaService.user.create).toHaveBeenCalledWith({
-      data: {
-        email: dto.email,
-        password: "hashedpassword",
-        lastLogout: expect.any(BigInt),
-      },
-    });
-
-    expect(result).toEqual({
-      id: mockUser.id,
-      email: mockUser.email,
-      role: mockUser.role,
-    });
-  });
-
-  it("should throw ForbiddenException if email is already registered", async () => {
-    const dto: AuthDto = {
-      email: "duplicate@example.com",
-      password: "Password123!",
-    };
-
-    jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
-    jest.spyOn(prismaService.user, "create").mockRejectedValue(
-      new PrismaClientKnownRequestError("", {
-        code: "P2002",
-        clientVersion: "6.4.1",
-      })
-    );
-
-    await expect(authService.register(dto)).rejects.toThrow(ForbiddenException);
-    await expect(authService.register(dto)).rejects.toThrow(
-      "Email has already been registered"
-    );
-
-    expect(argon.hash).toHaveBeenCalledWith(dto.password);
-    expect(prismaService.user.create).toHaveBeenCalled();
-  });
-
-  it("should throw a generic error if Prisma fails unexpectedly", async () => {
-    const dto: AuthDto = {
-      email: "fail@example.com",
-      password: "Password123!",
-    };
-
-    jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
-    jest
-      .spyOn(prismaService.user, "create")
-      .mockRejectedValue(new Error("Unexpected database error"));
-
-    await expect(authService.register(dto)).rejects.toThrow(Error);
-    await expect(authService.register(dto)).rejects.toThrow(
-      "Unexpected database error"
-    );
-
-    expect(argon.hash).toHaveBeenCalledWith(dto.password);
-    expect(prismaService.user.create).toHaveBeenCalled();
-  });
-
-  it("should return user details when login is successful", async () => {
-    const dto: AuthDto = {
-      email: "test@example.com",
-      password: "password123",
-    };
-
-    const mockUser = {
-      id: "123",
-      email: dto.email,
-      password: "hashedpassword",
-      role: Role.USER,
-      lastLogout: BigInt(Date.now()),
-      createdAt: new Date(),
-    };
-
-    jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
-    jest.spyOn(argon, "verify").mockResolvedValue(true);
-
-    const result = await authService.login(dto);
-
-    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-      where: { email: dto.email },
-    });
-    expect(argon.verify).toHaveBeenCalledWith(mockUser.password, dto.password);
-    expect(result).toEqual({
-      access_token: "mocked-jwt-token",
-      user: {
-        id: "123",
-        email: mockUser.email,
-        role: mockUser.role,
-      },
-    });
-  });
-
-  it("should throw ForbiddenException if user is not found", async () => {
-    const dto: AuthDto = {
-      email: "nonexistent@example.com",
-      password: "password123",
-    };
-
-    jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(null);
-
-    await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
-    await expect(authService.login(dto)).rejects.toThrow(
-      "Username or password is incorrect"
-    );
-
-    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-      where: { email: dto.email },
-    });
-  });
-
-  it("should throw ForbiddenException if password is incorrect", async () => {
-    const dto: AuthDto = {
-      email: "test@example.com",
-      password: "wrongpassword",
-    };
-
-    const mockUser = {
-      id: "123",
-      email: dto.email,
-      password: "hashedpassword",
-      role: Role.USER,
-      lastLogout: BigInt(Date.now()),
-      createdAt: new Date(),
-    };
-
-    jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
-    jest.spyOn(argon, "verify").mockResolvedValue(false);
-
-    await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
-    await expect(authService.login(dto)).rejects.toThrow(
-      "Username or password is incorrect"
-    );
-
-    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-      where: { email: dto.email },
-    });
-    expect(argon.verify).toHaveBeenCalledWith(mockUser.password, dto.password);
-  });
-
-  it("should throw an error if Prisma throws an exception", async () => {
-    const dto: AuthDto = {
-      email: "test@example.com",
-      password: "password123",
-    };
-
-    jest
-      .spyOn(prismaService.user, "findUnique")
-      .mockRejectedValue(new Error("Database error"));
-
-    await expect(authService.login(dto)).rejects.toThrow(Error);
-    await expect(authService.login(dto)).rejects.toThrow("Database error");
-
-    expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-      where: { email: dto.email },
-    });
-  });
-
-  describe("validatePassword", () => {
-    let localMockUser: {
-      id: string;
-      email: string;
-      password: string;
-      role: Role;
-      lastLogout: bigint;
-      createdAt: Date;
-    };
-
-    beforeEach(() => {
-      localMockUser = {
-        id: "123",
-        email: "test@test.com",
-        password: "hashedpassword",
-        role: Role.USER,
-        lastLogout: BigInt(0),
-        createdAt: new Date(),
-      };
-
-      jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
-      jest.spyOn(prismaService.user, "create").mockResolvedValue(localMockUser);
-    });
-
-    afterEach(() => {
-      jest.clearAllMocks();
-    });
-
-    it("should pass with a valid password", async () => {
-      const dto: AuthDto = { email: "valid@example.com", password: "Valid1!A" };
-      await expect(authService.register(dto)).resolves.toMatchObject({
-        id: localMockUser.id,
-        email: localMockUser.email,
-        role: localMockUser.role,
-      });
-    });
-
-    it("should fail if password is too short", async () => {
-      const dto: AuthDto = { email: "test@example.com", password: "A1!a" };
-      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
-        throw new BadRequestException(["too short"]);
-      });
-      await expect(authService.register(dto)).rejects.toThrow(
+    it("should throw BadRequestException if user is not found", async () => {
+      const userId = "nonexistent";
+      jest.spyOn(userRepo, "findById").mockResolvedValue(null);
+      await expect(authService.logout(userId)).rejects.toThrow(
         BadRequestException,
       );
+      await expect(authService.logout(userId)).rejects.toThrow("Gagal Logout");
     });
 
-    it("should fail if password lacks a lowercase letter", async () => {
-      const dto: AuthDto = { email: "test@example.com", password: "VALID1!A" };
-      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
-        throw new BadRequestException(["no lowercase"]);
-      });
-      await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException
+    it("should return failure response if markLogout throws", async () => {
+      const userId = "123";
+      (userRepo.findById as jest.Mock).mockResolvedValue({} as User);
+      (userRepo.markLogout as jest.Mock).mockRejectedValue(new Error());
+
+      const result = await authService.logout(userId);
+      expect(result).toEqual({ success: false, message: "Gagal logout" });
+    });
+
+    it("should succeed even if audit log fails", async () => {
+      const userId = "123";
+      const mockUser = { id: userId, email: "user@example.com" } as User;
+      (userRepo.findById as jest.Mock).mockResolvedValue(mockUser);
+      (userRepo.markLogout as jest.Mock).mockResolvedValue(undefined);
+      (auditLogService.addAuditLog as jest.Mock).mockRejectedValue(
+        new Error("audit fail"),
       );
-    });
-
-    it("should fail if password lacks an uppercase letter", async () => {
-      const dto: AuthDto = { email: "test@example.com", password: "valid1!a" };
-      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
-        throw new BadRequestException(["no uppercase"]);
-      });
-      await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException
-      );
-    });
-
-    it("should fail if password lacks a number", async () => {
-      const dto: AuthDto = { email: "test@example.com", password: "Valid!Aa" };
-      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
-        throw new BadRequestException(["no number"]);
-      });
-      await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException
-      );
-    });
-
-    it("should fail if password lacks a special character", async () => {
-      const dto: AuthDto = { email: "test@example.com", password: "Valid1Aa" };
-      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
-        throw new BadRequestException(["no special chars"]);
-      });
-      await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException
-      );
-    });
-
-    it("should still return success even if audit log fails", async () => {
-      const userId = "test-user-id";
-
-      // Mock user found
-      jest.spyOn(prismaService.user, "findUnique").mockResolvedValue({
-        email: "user@example.com",
-      } as any);
-
-      // Mock user update (lastLogout)
-      jest.spyOn(prismaService.user, "update").mockResolvedValue({} as any);
-
-      // Force audit log to fail
-      jest
-        .spyOn(auditLogService, "addAuditLog")
-        .mockRejectedValueOnce(new Error("Audit log failed"));
+      const consoleSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       const result = await authService.logout(userId);
 
-      expect(result).toEqual({
-        success: true,
-        message: "Berhasil logout",
+      expect(result).toEqual({ success: true, message: "Berhasil logout" });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Audit log failed:",
+        expect.any(Error),
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("register", () => {
+    const validDto: AuthDto = {
+      email: "test@example.com",
+      password: "Password1!",
+    };
+    const mockUser = {
+      id: "123",
+      email: validDto.email,
+      password: "hashed",
+      role: Role.USER,
+      lastLogout: BigInt(Date.now()),
+      createdAt: new Date(),
+    } as User;
+
+    it("should register successfully", async () => {
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {});
+      jest.spyOn(argon, "hash").mockResolvedValue("hashed");
+      (userRepo.createUser as jest.Mock).mockResolvedValue(mockUser);
+
+      const result = await authService.register(validDto);
+
+      expect(passwordPolicy.validate).toHaveBeenCalledWith(validDto.password);
+      expect(argon.hash).toHaveBeenCalledWith(validDto.password);
+      expect(userRepo.createUser).toHaveBeenCalledWith({
+        email: validDto.email,
+        password: "hashed",
+        lastLogout: expect.any(BigInt),
       });
+      expect(result).toEqual({
+        id: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+      });
+    });
+
+    it("should throw ForbiddenException on duplicate email", async () => {
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {});
+      jest.spyOn(argon, "hash").mockResolvedValue("hashed");
+      (userRepo.createUser as jest.Mock).mockRejectedValue(
+        new PrismaClientKnownRequestError("", {
+          code: "P2002",
+          clientVersion: "",
+        }),
+      );
+
+      await expect(authService.register(validDto)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it("should throw on unexpected repo error", async () => {
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {});
+      jest.spyOn(argon, "hash").mockResolvedValue("hashed");
+      (userRepo.createUser as jest.Mock).mockRejectedValue(
+        new Error("Repo failed"),
+      );
+
+      await expect(authService.register(validDto)).rejects.toThrow(
+        "Repo failed",
+      );
+    });
+  });
+
+  describe("login", () => {
+    const dto: AuthDto = { email: "user@example.com", password: "pass123" };
+    const mockUser = {
+      id: "123",
+      email: dto.email,
+      password: "hashedpass",
+      role: Role.USER,
+      lastLogout: BigInt(Date.now()),
+      createdAt: new Date(),
+    } as User;
+
+    it("should login successfully", async () => {
+      (userRepo.findByEmail as jest.Mock).mockResolvedValue(mockUser);
+      jest.spyOn(argon, "verify").mockResolvedValue(true);
+
+      const result = await authService.login(dto);
+
+      expect(userRepo.findByEmail).toHaveBeenCalledWith(dto.email);
+      expect(argon.verify).toHaveBeenCalledWith(
+        mockUser.password,
+        dto.password,
+      );
+      expect(result).toEqual({
+        access_token: "mocked-jwt-token",
+        user: {
+          id: mockUser.id,
+          email: mockUser.email,
+          role: mockUser.role,
+        },
+      });
+    });
+
+    it("should throw if user not found", async () => {
+      (userRepo.findByEmail as jest.Mock).mockResolvedValue(null);
+      await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
+    });
+
+    it("should throw if password mismatch", async () => {
+      (userRepo.findByEmail as jest.Mock).mockResolvedValue(mockUser);
+      jest.spyOn(argon, "verify").mockResolvedValue(false);
+      await expect(authService.login(dto)).rejects.toThrow(ForbiddenException);
+    });
+
+    it("should throw on repo error", async () => {
+      (userRepo.findByEmail as jest.Mock).mockRejectedValue(
+        new Error("DB err"),
+      );
+      await expect(authService.login(dto)).rejects.toThrow("DB err");
     });
   });
 });

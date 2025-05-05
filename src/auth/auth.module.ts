@@ -4,6 +4,7 @@ import { AuthService } from "./services/auth.service";
 import { JwtService } from "./jwt/jwt.service";
 import { AuditLogModule } from "../auditLog/auditLog.module";
 import { DefaultPasswordPolicy } from "./policies/default-password.policy";
+import { PrismaUserRepository } from "./repositories/prisma-user.repository";
 
 @Module({
   imports: [AuditLogModule],
@@ -13,6 +14,10 @@ import { DefaultPasswordPolicy } from "./policies/default-password.policy";
     {
       provide: "PasswordPolicy",
       useClass: DefaultPasswordPolicy,
+    },
+    {
+      provide: "UserRepository",
+      useClass: PrismaUserRepository,
     },
   ],
   controllers: [AuthController],
