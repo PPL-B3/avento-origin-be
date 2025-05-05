@@ -74,6 +74,7 @@ jobs:
             FE_URL=${{ secrets.FE_URL }}
             ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
             ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+            SENTRY_DSN=${{ secrets. }}
           EOF
       
       - name: Set up ssh key
