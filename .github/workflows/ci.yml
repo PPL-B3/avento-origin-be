@@ -76,13 +76,20 @@ jobs:
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
         run: |
           # Install sentry-cli
           curl -sL https://sentry.io/get-cli/ | bash
           export PATH="$HOME/.local/bin:$PATH"
-            
+
+          # Create a new release in Sentry
+          sentry-cli --auth-token $SENTRY_AUTH_TOKEN releases new $GITHUB_SHA --project $SENTRY_PROJECT --org $SENTRY_ORG
+
+          # Set the commits for the release
+          sentry-cli releases set-commits --commit $GITHUB_SHA=$GITHUB_SHA $GITHUB_SHA --project $SENTRY_PROJECT --org $SENTRY_ORG
+
           # Upload sourcemaps after build
-          sentry-cli --auth-token $SENTRY_AUTH_TOKEN releases new $GITHUB_SHA
-          sentry-cli releases set-commits --commit $GITHUB_SHA=$GITHUB_SHA $GITHUB_SHA
-          sentry-cli releases files $GITHUB_SHA upload-sourcemaps ./dist --url-prefix '~/dist'
-          sentry-cli releases finalize $GITHUB_SHA
+          sentry-cli releases files $GITHUB_SHA upload-sourcemaps ./dist --url-prefix '~/dist' --project $SENTRY_PROJECT --org $SENTRY_ORG
+
+          # Finalize the release
+          sentry-cli releases finalize $GITHUB_SHA --project $SENTRY_PROJECT --org $SENTRY_ORG
