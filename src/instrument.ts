@@ -1,9 +1,13 @@
 import * as Sentry from "@sentry/nestjs";
+import { ConfigService } from "@nestjs/config";
 
-Sentry.init({
-  dsn: "https://fc0974cfc7efd0153f51008ff6ea46da@o4509272020680704.ingest.de.sentry.io/4509272031101008",
+// We'll need to initialize Sentry after the app module is created
+// so we can access the ConfigService
+export function initSentry(configService: ConfigService) {
+  Sentry.init({
+    dsn: configService.get<string>("SENTRY_DSN"),
 
-  // Setting this option to true will send default PII data to Sentry.
-  // For example, automatic IP address collection on events
-  sendDefaultPii: true,
-});
+    // Keep the original settings
+    sendDefaultPii: true,
+  });
+}

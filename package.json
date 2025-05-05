@@ -95,7 +95,9 @@
       "**/*.ts",
       "!**/*.module.ts",
       "!main.ts",
-      "!hello/**"
+      "!hello/**",
+      "!sentry-exception.filter.ts",
+      "!instrument.ts"
     ],
     "collectCoverage": true,
     "coverageDirectory": "../coverage",

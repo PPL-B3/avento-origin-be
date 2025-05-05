@@ -1,10 +1,12 @@
-import "./instrument.ts";
+import "./instrument";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { HighlightInterceptor, H } from "@highlight-run/nest";
+import { SentryExceptionFilter } from "./sentry-exception.filter";
+import {initSentry} from "./instrument";
 
 const env = {
   projectID: "ng2z350g",
@@ -30,7 +32,7 @@ async function bootstrap() {
   app.enableCors();
 
   const configService = app.get(ConfigService);
-
+  initSentry(configService);
   const config = new DocumentBuilder()
     .setTitle("Avento Origin")
     .setDescription("Avento Origin API Documentation")
@@ -43,7 +45,7 @@ async function bootstrap() {
     app,
     documentFactory,
   );
-
+  app.useGlobalFilters(new SentryExceptionFilter());
   await app.listen(process.env.PORT ?? 4000);
 }
 void bootstrap();
