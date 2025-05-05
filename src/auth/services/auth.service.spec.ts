@@ -8,11 +8,13 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "../jwt/jwt.service";
 import { AuditLogService } from "../../auditLog/auditLog.service";
 import { Role } from "@prisma/client";
+import { PasswordPolicy } from "../interfaces/password-policy.interface";
 
 describe("AuthService", () => {
   let authService: AuthService;
   let prismaService: PrismaService;
   let auditLogService: AuditLogService;
+  let passwordPolicy: PasswordPolicy;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,12 +42,19 @@ describe("AuthService", () => {
             addAuditLog: jest.fn(),
           },
         },
+        {
+          provide: "PasswordPolicy",
+          useValue: {
+            validate: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     authService = module.get<AuthService>(AuthService);
     prismaService = module.get<PrismaService>(PrismaService);
     auditLogService = module.get<AuditLogService>(AuditLogService);
+    passwordPolicy = module.get<PasswordPolicy>("PasswordPolicy");
   });
 
   afterEach(() => {
@@ -322,14 +331,17 @@ describe("AuthService", () => {
         lastLogout: BigInt(0),
         createdAt: new Date(),
       };
+
+      jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
+      jest.spyOn(prismaService.user, "create").mockResolvedValue(localMockUser);
+    });
+
+    afterEach(() => {
+      jest.clearAllMocks();
     });
 
     it("should pass with a valid password", async () => {
       const dto: AuthDto = { email: "valid@example.com", password: "Valid1!A" };
-
-      jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
-      jest.spyOn(prismaService.user, "create").mockResolvedValue(localMockUser);
-
       await expect(authService.register(dto)).resolves.toMatchObject({
         id: localMockUser.id,
         email: localMockUser.email,
@@ -339,13 +351,19 @@ describe("AuthService", () => {
 
     it("should fail if password is too short", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "A1!a" };
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
+        throw new BadRequestException(["too short"]);
+      });
       await expect(authService.register(dto)).rejects.toThrow(
-        BadRequestException
+        BadRequestException,
       );
     });
 
     it("should fail if password lacks a lowercase letter", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "VALID1!A" };
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
+        throw new BadRequestException(["no lowercase"]);
+      });
       await expect(authService.register(dto)).rejects.toThrow(
         BadRequestException
       );
@@ -353,6 +371,9 @@ describe("AuthService", () => {
 
     it("should fail if password lacks an uppercase letter", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "valid1!a" };
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
+        throw new BadRequestException(["no uppercase"]);
+      });
       await expect(authService.register(dto)).rejects.toThrow(
         BadRequestException
       );
@@ -360,6 +381,9 @@ describe("AuthService", () => {
 
     it("should fail if password lacks a number", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "Valid!Aa" };
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
+        throw new BadRequestException(["no number"]);
+      });
       await expect(authService.register(dto)).rejects.toThrow(
         BadRequestException
       );
@@ -367,10 +391,14 @@ describe("AuthService", () => {
 
     it("should fail if password lacks a special character", async () => {
       const dto: AuthDto = { email: "test@example.com", password: "Valid1Aa" };
+      (passwordPolicy.validate as jest.Mock).mockImplementation(() => {
+        throw new BadRequestException(["no special chars"]);
+      });
       await expect(authService.register(dto)).rejects.toThrow(
         BadRequestException
       );
     });
+
     it("should still return success even if audit log fails", async () => {
       const userId = "test-user-id";
 
