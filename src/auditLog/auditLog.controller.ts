@@ -1,10 +1,5 @@
-import {
-  Controller,
-  DefaultValuePipe,
-  Get,
-  ParseIntPipe,
-  Query,
-} from "@nestjs/common";
+import { Controller, Get, Post, Body, Query } from "@nestjs/common";
+import { SearchAuditLogDto } from "./dto/search-audit-log.dto";
 import { AuditLogService } from "./auditLog.service";
 
 @Controller("audit-log")
@@ -17,40 +12,33 @@ export class AuditLogController {
   }
 
   @Get("search")
-  async searchAuditLogs(
-    @Query("page", new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
-    @Query("limit", new DefaultValuePipe(10), ParseIntPipe) limit: number = 10,
-    @Query("query") query?: string,
-    @Query("eventType") eventType?: string,
-    @Query("startDate") startDate?: string,
-    @Query("endDate") endDate?: string,
-    @Query("userId") userId?: string,
-  ) {
+  async searchAuditLogs(@Query() dto: SearchAuditLogDto) {
     return this.auditLogService.findAll({
-      page,
-      limit,
-      query,
-      eventType,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      userId,
+      ...dto,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
     });
   }
 
   @Get("count")
-  async getAuditLogsCount(
-    @Query("query") query?: string,
-    @Query("eventType") eventType?: string,
-    @Query("startDate") startDate?: string,
-    @Query("endDate") endDate?: string,
-    @Query("userId") userId?: string,
-  ) {
+  async getAuditLogsCount(@Query() dto: SearchAuditLogDto) {
     return this.auditLogService.count({
-      query,
-      eventType,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-      userId,
+      ...dto,
+      startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+      endDate: dto.endDate ? new Date(dto.endDate) : undefined,
     });
+  }
+
+  @Post()
+  async createAuditLog(
+    @Body()
+    body: {
+      eventType: string;
+      userID: string;
+      details: string;
+      documentID?: string;
+    },
+  ) {
+    return this.auditLogService.addAuditLog(body);
   }
 }

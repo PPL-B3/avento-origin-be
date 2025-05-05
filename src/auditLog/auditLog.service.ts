@@ -1,22 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { Prisma } from "@prisma/client";
+import { SearchAuditLogDto } from "./dto/search-audit-log.dto";
 
-interface PaginationParams {
-  page?: number;
-  limit?: number;
-  query?: string;
-  eventType?: string;
+type SearchParams = Omit<SearchAuditLogDto, "startDate" | "endDate"> & {
   startDate?: Date;
   endDate?: Date;
-  userId?: string;
-}
+};
 
 @Injectable()
 export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Fungsi untuk menambahkan audit log baru
   async addAuditLog({
     eventType,
     userID,
@@ -43,7 +38,6 @@ export class AuditLogService {
     }
   }
 
-  // Fungsi untuk mendapatkan semua audit log tanpa pagination (versi original)
   async getAllAuditLogs() {
     return this.prisma.auditLog.findMany({
       select: {
@@ -60,8 +54,7 @@ export class AuditLogService {
     });
   }
 
-  // Fungsi untuk mencari audit log dengan pagination dan filter
-  async findAll(params: PaginationParams) {
+  async findAll(params: SearchParams) {
     const {
       page = 1,
       limit = 10,
@@ -117,10 +110,8 @@ export class AuditLogService {
     };
   }
 
-  // Fungsi untuk menghitung jumlah audit log berdasarkan filter
-  async count(params: PaginationParams) {
+  async count(params: SearchParams) {
     const { query, eventType, startDate, endDate, userId } = params;
-
     const where = this.buildWhereClause(
       query,
       eventType,
@@ -128,13 +119,10 @@ export class AuditLogService {
       endDate,
       userId,
     );
-
     const count = await this.prisma.auditLog.count({ where });
-
     return { count };
   }
 
-  // Fungsi untuk membangun clause WHERE untuk pencarian
   private buildWhereClause(
     query?: string,
     eventType?: string,
@@ -144,9 +132,7 @@ export class AuditLogService {
   ): Prisma.AuditLogWhereInput {
     const where: Prisma.AuditLogWhereInput = {};
 
-    // Handle search query across multiple fields
     if (query) {
-      // Coba parse query sebagai tanggal jika formatnya sesuai
       const possibleDate = new Date(query);
       const isValidDate = !isNaN(possibleDate.getTime());
 
@@ -159,16 +145,13 @@ export class AuditLogService {
         },
       ];
 
-      // Jika query tampak seperti tanggal yang valid, tambahkan ke pencarian
       if (isValidDate) {
-        // Tentukan rentang tanggal untuk satu hari
         const startOfDay = new Date(possibleDate);
         startOfDay.setHours(0, 0, 0, 0);
 
         const endOfDay = new Date(possibleDate);
         endOfDay.setHours(23, 59, 59, 999);
 
-        // Tambahkan pencarian berdasarkan tanggal
         where.OR.push({
           timestamp: {
             gte: startOfDay,
@@ -178,25 +161,16 @@ export class AuditLogService {
       }
     }
 
-    // Filter by event type
     if (eventType) {
       where.eventType = eventType;
     }
 
-    // Filter by date range
     if (startDate || endDate) {
       where.timestamp = {};
-
-      if (startDate) {
-        where.timestamp.gte = startDate;
-      }
-
-      if (endDate) {
-        where.timestamp.lte = endDate;
-      }
+      if (startDate) where.timestamp.gte = startDate;
+      if (endDate) where.timestamp.lte = endDate;
     }
 
-    // Filter by user ID
     if (userId) {
       where.userID = userId;
     }

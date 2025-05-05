@@ -80,6 +80,15 @@ describe("AuditLogService", () => {
       expect(prismaService.auditLog.create).toHaveBeenCalledWith({
         data: auditLogData,
       });
+
+      // Verify that the error is logged to console
+      const consoleSpy = jest.spyOn(console, "error");
+      await expect(service.addAuditLog(auditLogData)).rejects.toThrow();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Failed to add audit log:",
+        expect.any(Error),
+      );
+      consoleSpy.mockRestore();
     });
 
     it("should create a new audit log without documentID", async () => {
@@ -345,6 +354,41 @@ describe("AuditLogService", () => {
       );
     });
 
+    it("should filter by invalid date in query string without adding date filter", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      const invalidDateString = "not-a-date";
+
+      // Act
+      const result = await service.findAll({ query: invalidDateString });
+
+      // Assert
+      const expectedWhereClause = {
+        OR: [
+          { eventType: { contains: invalidDateString, mode: "insensitive" } },
+          { userID: { contains: invalidDateString, mode: "insensitive" } },
+          { details: { contains: invalidDateString, mode: "insensitive" } },
+          {
+            document: {
+              documentName: {
+                contains: invalidDateString,
+                mode: "insensitive",
+              },
+            },
+          },
+        ],
+      };
+
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expectedWhereClause,
+        }),
+      );
+    });
+
     it("should filter by eventType", async () => {
       // Arrange
       const mockLogs = [];
@@ -539,6 +583,45 @@ describe("AuditLogService", () => {
 
       expect(prismaService.auditLog.count).toHaveBeenCalledWith({
         where: expectedWhereClause,
+      });
+    });
+
+    it("should apply valid date filter to count", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(3);
+
+      const dateString = "2023-01-01";
+      const searchDate = new Date(dateString);
+
+      const startOfDay = new Date(searchDate);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(searchDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // Act
+      const result = await service.count({ query: dateString });
+
+      // Assert
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { eventType: { contains: dateString, mode: "insensitive" } },
+            { userID: { contains: dateString, mode: "insensitive" } },
+            { details: { contains: dateString, mode: "insensitive" } },
+            {
+              document: {
+                documentName: { contains: dateString, mode: "insensitive" },
+              },
+            },
+            {
+              timestamp: {
+                gte: startOfDay,
+                lte: endOfDay,
+              },
+            },
+          ],
+        },
       });
     });
 
