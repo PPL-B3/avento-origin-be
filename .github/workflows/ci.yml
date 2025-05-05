@@ -71,3 +71,18 @@ jobs:
         timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_CSUI }}
+
+      - name: Upload sourcemaps to Sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          # Install sentry-cli
+          curl -sL https://sentry.io/get-cli/ | bash
+          export PATH="$HOME/.local/bin:$PATH"
+            
+          # Upload sourcemaps after build
+          sentry-cli --auth-token $SENTRY_AUTH_TOKEN releases new $GITHUB_SHA
+          sentry-cli releases set-commits --commit $GITHUB_SHA=$GITHUB_SHA $GITHUB_SHA
+          sentry-cli releases files $GITHUB_SHA upload-sourcemaps ./dist --url-prefix '~/dist'
+          sentry-cli releases finalize $GITHUB_SHA

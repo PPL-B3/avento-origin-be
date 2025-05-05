@@ -5,6 +5,7 @@ import {
   RequestMethod,
 } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
+import { SentryModule } from '@sentry/nestjs/setup';
 import { DocumentsModule } from "./document/document.module";
 import { HelloModule } from "./hello/hello.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -24,6 +25,7 @@ import { AdminSeederService } from "./auth/adminseeder.service";
     AuthModule,
     DocumentsModule,
     PrometheusModule.register(),
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
