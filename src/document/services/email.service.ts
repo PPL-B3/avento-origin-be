@@ -71,24 +71,28 @@ export class EmailService {
     publicQrCodeId: string,
     privateQrCodeId: string
   ): Promise<void> {
+    const domain = "https://avento-origin.vercel.app/metadata/";
+    const publicQrURL = `${domain}${publicQrCodeId}`;
+    const privateQrURL = `${domain}${privateQrCodeId}`;
+
     const ownershipGrantedHTML = `
-  <p>
-    Anda telah diberikan kepemilikan atas dokumen <strong>${documentName}</strong> melalui <strong>Avento Origin</strong>.
-  </p>
-  <p>
-    Ini adalah informasi QR Code Anda:
-  </p>
-  <ul>
-    <li>
-      <strong>Public QR Code ID (untuk verifikasi kepemilikan):</strong><br />
-      <a href="${publicQrCodeId}" target="_blank">${publicQrCodeId}</a>
-    </li>
-    <li>
-      <strong>Private QR Code ID (Penggunaan Pribadi untuk transfer & melihat dokumen):</strong><br />
-      <a href="${privateQrCodeId}" target="_blank">${privateQrCodeId}</a>
-    </li>
-  </ul>
-`;
+    <p>
+      Anda telah diberikan kepemilikan atas dokumen <strong>${documentName}</strong> melalui <strong>Avento Origin</strong>.
+    </p>
+    <p>
+      Ini adalah informasi QR Code Anda:
+    </p>
+    <ul>
+      <li>
+        <strong>Public QR Code ID (untuk verifikasi kepemilikan):</strong><br />
+        <a href="${publicQrURL}" target="_blank">${publicQrURL}</a>
+      </li>
+      <li>
+        <strong>Private QR Code ID (Penggunaan Pribadi untuk transfer & melihat dokumen):</strong><br />
+        <a href="${privateQrURL}" target="_blank">${privateQrURL}</a>
+      </li>
+    </ul>
+  `;
 
     const ownershipRevokedHTML = `
 <p>
