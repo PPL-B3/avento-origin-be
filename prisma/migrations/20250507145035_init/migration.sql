@@ -29,6 +29,7 @@ CREATE TABLE "Document" (
     "filePath" TEXT NOT NULL,
     "uploadDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publisher" TEXT NOT NULL,
+    "publicViewCount" INTEGER NOT NULL DEFAULT 0,
     "pendingOwner" TEXT,
     "otp" TEXT,
     "otpExpiry" TIMESTAMP(3),
