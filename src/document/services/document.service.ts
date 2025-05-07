@@ -344,6 +344,15 @@ export class DocumentService {
     // Include filePath only if the requested QR code is private.
     if (qrCode.isPrivate) {
       response.filePath = document.filePath;
+    } else {
+      await this.prisma.document.update({
+        where: { documentID: document.documentID },
+        data: {
+          publicViewCount: {
+            increment: 1,
+          },
+        },
+      });
     }
 
     return response;
