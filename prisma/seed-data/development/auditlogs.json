@@ -49,7 +49,7 @@
     "logID": "9d8f3ba4-ff5a-4861-85be-5b004ef5e75d",
     "eventType": "CLAIM_DOCUMENT",
     "timestamp": "2025-05-01 15:49:32.579",
-    "userID": "another.user2@another.example.com",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
     "documentID": "a891297c-1049-41bf-9862-86fd25c77510",
     "details": "Document \"index_compression.pdf\" successfully claimed."
   },
