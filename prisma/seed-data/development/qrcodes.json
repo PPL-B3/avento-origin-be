@@ -4,7 +4,7 @@
     "owner": "user1@example.com",
     "isPrivate": false,
     "isActive": true,
-    "generatedDate": "2025-05-01 15:47:30.361",
+    "generatedDate": "2025-05-01T15:47:30.361Z",
     "documentId": "a7f9c8de-54ed-453b-9732-8951371b84cb"
   },
   {
@@ -12,7 +12,7 @@
     "owner": "user1@example.com",
     "isPrivate": true,
     "isActive": true,
-    "generatedDate": "2025-05-01 15:47:30.361",
+    "generatedDate": "2025-05-01T15:47:30.361Z",
     "documentId": "a7f9c8de-54ed-453b-9732-8951371b84cb"
   },
   {
@@ -20,7 +20,7 @@
     "owner": "user1@example.com",
     "isPrivate": false,
     "isActive": false,
-    "generatedDate": "2025-05-01 15:46:21.434",
+    "generatedDate": "2025-05-01T15:46:21.434Z",
     "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
   },
   {
@@ -28,7 +28,7 @@
     "owner": "user1@example.com",
     "isPrivate": true,
     "isActive": false,
-    "generatedDate": "2025-05-01 15:46:21.434",
+    "generatedDate": "2025-05-01T15:46:21.434Z",
     "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
   },
   {
@@ -36,7 +36,7 @@
     "owner": "another.user2@another.example.com",
     "isPrivate": false,
     "isActive": true,
-    "generatedDate": "2025-05-01 15:49:32.571",
+    "generatedDate": "2025-05-01T15:49:32.571Z",
     "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
   },
   {
@@ -44,7 +44,7 @@
     "owner": "another.user2@another.example.com",
     "isPrivate": true,
     "isActive": true,
-    "generatedDate": "2025-05-01 15:49:32.571",
+    "generatedDate": "2025-05-01T15:49:32.571Z",
     "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
   }
 ]
