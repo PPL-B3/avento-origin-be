@@ -99,7 +99,7 @@ async function seedDocuments(seedDataPath: string) {
   // Convert date strings to Date objects
   for (const doc of documentsData) {
     if (doc.uploadDate) {
-      doc.uploadDate = new Date(doc.uploadDate);
+      doc.uploadDate = new Date(doc.uploadDate.replace(" ", "T") + "Z");
     }
   }
 
