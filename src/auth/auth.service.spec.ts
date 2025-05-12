@@ -138,6 +138,7 @@ describe("AuthService", () => {
       role: Role.USER,
       lastLogout: BigInt(Date.now()),
       createdAt: new Date(),
+      uploadCount: 0,
     };
 
     jest.spyOn(argon, "hash").mockResolvedValue("hashedpassword");
@@ -217,6 +218,7 @@ describe("AuthService", () => {
       role: Role.USER,
       lastLogout: BigInt(Date.now()),
       createdAt: new Date(),
+      uploadCount: 0,
     };
 
     jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
@@ -269,6 +271,7 @@ describe("AuthService", () => {
       role: Role.USER,
       lastLogout: BigInt(Date.now()),
       createdAt: new Date(),
+      uploadCount: 0,
     };
 
     jest.spyOn(prismaService.user, "findUnique").mockResolvedValue(mockUser);
@@ -311,6 +314,7 @@ describe("AuthService", () => {
       role: Role;
       lastLogout: bigint;
       createdAt: Date;
+      uploadCount: number;
     };
 
     beforeEach(() => {
@@ -321,6 +325,7 @@ describe("AuthService", () => {
         role: Role.USER,
         lastLogout: BigInt(0),
         createdAt: new Date(),
+        uploadCount: 0,
       };
     });
 
