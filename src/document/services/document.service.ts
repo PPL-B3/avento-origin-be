@@ -58,6 +58,11 @@ export class DocumentService {
       publisher: user.email,
     });
 
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { uploadCount: { increment: 1 } },
+    });
+
     await this.auditLogService.addAuditLog({
       eventType: "UPLOAD_DOCUMENT",
       userID: user.id,
