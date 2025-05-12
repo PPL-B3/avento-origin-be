@@ -34,6 +34,7 @@ describe("DocumentService", () => {
     prisma = {
       $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
       user: {
+        update: jest.fn(),
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
       },
@@ -98,6 +99,10 @@ describe("DocumentService", () => {
       expect(result).toEqual({
         privateId: "new-qr-private",
         publicId: "new-qr-public",
+      });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-id-123" },
+        data: { uploadCount: { increment: 1 } },
       });
     });
 
