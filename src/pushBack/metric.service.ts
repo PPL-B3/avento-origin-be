@@ -6,23 +6,23 @@ import { Pushgateway } from "prom-client";
 export class MetricService {
   private readonly logger = new Logger(MetricService.name);
 
-  private userLoginCounter: client.Counter;
-  private userLogoutCounter: client.Counter;
-  private userLoginDurationHistogram: client.Histogram;
-  private userLoginFailureCounter: client.Counter;
+  private readonly userLoginCounter: client.Counter;
+  private readonly userLogoutCounter: client.Counter;
+  private readonly userLoginDurationHistogram: client.Histogram;
+  private readonly userLoginFailureCounter: client.Counter;
 
-  private documentUploadCounter: client.Counter;
-  private documentUploadDurationHistogram: client.Histogram;
-  private documentUploadSizeGauge: client.Gauge;
-  private documentUploadFailureCounter: client.Counter;
+  private readonly documentUploadCounter: client.Counter;
+  private readonly documentUploadDurationHistogram: client.Histogram;
+  private readonly documentUploadSizeGauge: client.Gauge;
+  private readonly documentUploadFailureCounter: client.Counter;
 
-  private logSearchCounter: client.Counter;
-  private logSearchDurationGauge: client.Gauge;
-  private logSearchFailureCounter: client.Counter;
+  private readonly logSearchCounter: client.Counter;
+  private readonly logSearchDurationGauge: client.Gauge;
+  private readonly logSearchFailureCounter: client.Counter;
 
-  private documentTransferCounter: client.Counter;
-  private documentTransferDurationGauge: client.Gauge;
-  private documentTransferFailureCounter: client.Counter;
+  private readonly documentTransferCounter: client.Counter;
+  private readonly documentTransferDurationGauge: client.Gauge;
+  private readonly documentTransferFailureCounter: client.Counter;
 
   constructor() {
     try {

@@ -92,7 +92,8 @@
       "**/*.ts",
       "!**/*.module.ts",
       "!main.ts",
-      "!hello/**"
+      "!hello/**",
+      "!**/metric.service.ts"
     ],
     "collectCoverage": true,
     "coverageDirectory": "../coverage",

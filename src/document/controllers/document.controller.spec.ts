@@ -20,6 +20,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { ConfigService } from "@nestjs/config";
 import { JwtAuthMiddleware } from "../../auth/jwt/middleware/jwt-auth.middleware";
 import { RolesGuard } from "../../auth/roles.guard";
+import { MetricService } from "../../pushBack/metric.service";
 
 @Injectable()
 class MockAuthGuard implements CanActivate {
@@ -33,6 +34,7 @@ class MockAuthGuard implements CanActivate {
 describe("DocumentController", () => {
   let app: INestApplication;
   let docService: DocumentService;
+  let metricService: MetricService;
   let controller: DocumentController;
 
   const mockDocService = {
@@ -48,18 +50,24 @@ describe("DocumentController", () => {
     reverseOwnership: jest.fn(),
   };
 
-  // beforeEach(() => {
-  //   jest.spyOn(docService, "uploadDocument").mockResolvedValue({
-  //     privateId: "dummy-private-id",
-  //     publicId: "dummy-public-id",
-  //   });
-  // });
+  const mockMetricService = {
+    updateDocumentUploadMetric: jest.fn(),
+    updateDocumentUploadFailureMetric: jest.fn(),
+    updateDocumentUploadDurationMetric: jest.fn(),
+    updateDocumentUploadSizeMetric: jest.fn(),
+    updateDocumentTransferMetric: jest.fn(),
+    updateDocumentTransferFailureMetric: jest.fn(),
+    updateDocumentTransferDurationMetric: jest.fn(),
+    pushMetricsToGateway: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [MulterModule.register({})],
       controllers: [DocumentController],
       providers: [
         { provide: DocumentService, useValue: mockDocService },
+        { provide: MetricService, useValue: mockMetricService },
         JwtService,
         PrismaService,
         ConfigService,
@@ -73,12 +81,13 @@ describe("DocumentController", () => {
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
-      })
+      }),
     );
     await app.init();
 
     controller = moduleRef.get<DocumentController>(DocumentController);
     docService = moduleRef.get<DocumentService>(DocumentService);
+    metricService = moduleRef.get<MetricService>(MetricService);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -92,7 +101,7 @@ describe("DocumentController", () => {
         process.cwd(),
         "src",
         "document",
-        "dummy.pdf"
+        "dummy.pdf",
       );
 
       console.log("pathToDummyPDF:", pathToDummyPDF);
@@ -111,7 +120,18 @@ describe("DocumentController", () => {
           mimetype: "application/pdf",
         }),
         { documentName: "My Doc" },
-        "test-user"
+        "test-user",
+      );
+
+      // Verify metric calls
+      expect(metricService.updateDocumentUploadSizeMetric).toHaveBeenCalled();
+      expect(metricService.updateDocumentUploadMetric).toHaveBeenCalled();
+      expect(
+        metricService.updateDocumentUploadDurationMetric,
+      ).toHaveBeenCalled();
+      expect(metricService.pushMetricsToGateway).toHaveBeenCalledWith(
+        "document_upload",
+        "document_controller",
       );
     });
 
@@ -123,6 +143,15 @@ describe("DocumentController", () => {
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe("No file uploaded.");
+
+      // Verify failure metric was called
+      expect(
+        metricService.updateDocumentUploadFailureMetric,
+      ).toHaveBeenCalled();
+      expect(metricService.pushMetricsToGateway).toHaveBeenCalledWith(
+        "document_upload_failure",
+        "document_controller",
+      );
     });
 
     it("should reject non-PDF files", async () => {
@@ -134,6 +163,15 @@ describe("DocumentController", () => {
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe("Invalid file type.");
+
+      // Verify failure metric was called
+      expect(
+        metricService.updateDocumentUploadFailureMetric,
+      ).toHaveBeenCalled();
+      expect(metricService.pushMetricsToGateway).toHaveBeenCalledWith(
+        "document_upload_failure",
+        "document_controller",
+      );
     });
 
     it("should reject PDFs larger than 8MB", async () => {
@@ -147,6 +185,46 @@ describe("DocumentController", () => {
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe("File size exceeds 8MB limit.");
+
+      // Verify failure metric was called
+      expect(
+        metricService.updateDocumentUploadFailureMetric,
+      ).toHaveBeenCalled();
+      expect(metricService.pushMetricsToGateway).toHaveBeenCalledWith(
+        "document_upload_failure",
+        "document_controller",
+      );
+    });
+
+    it("should handle service errors and track failure metrics", async () => {
+      // Mock service to throw error
+      mockDocService.uploadDocument.mockRejectedValueOnce(
+        new Error("Service error"),
+      );
+
+      const pathToDummyPDF = path.resolve(
+        process.cwd(),
+        "src",
+        "document",
+        "dummy.pdf",
+      );
+
+      const res = await request(app.getHttpServer())
+        .post("/documents/upload")
+        .attach("file", pathToDummyPDF)
+        .field("documentName", "My Doc");
+
+      expect(res.status).toBe(500);
+
+      // Verify metrics were called
+      expect(metricService.updateDocumentUploadSizeMetric).toHaveBeenCalled();
+      expect(
+        metricService.updateDocumentUploadFailureMetric,
+      ).toHaveBeenCalled();
+      expect(metricService.pushMetricsToGateway).toHaveBeenCalledWith(
+        "document_upload_failure",
+        "document_controller",
+      );
     });
   });
 
@@ -164,17 +242,43 @@ describe("DocumentController", () => {
       expect(res.status).toBe(201);
       expect(docService.transferDocument).toHaveBeenCalledWith(
         "abc123",
-        "newowner@example.com"
+        "newowner@example.com",
+      );
+
+      // Verify metrics were called
+      expect(metricService.updateDocumentTransferMetric).toHaveBeenCalled();
+      expect(
+        metricService.updateDocumentTransferDurationMetric,
+      ).toHaveBeenCalled();
+      expect(metricService.pushMetricsToGateway).toHaveBeenCalledWith(
+        "document_transfer",
+        "document_controller",
       );
     });
 
-    // it("should return 400 for missing fields in transfer request", async () => {
-    //   const res = await request(app.getHttpServer())
-    //     .post("/documents/transfer")
-    //     .send({});
+    it("should handle transfer errors and track failure metrics", async () => {
+      mockDocService.transferDocument.mockRejectedValueOnce(
+        new BadRequestException("Invalid document ID"),
+      );
 
-    //   expect(res.status).toBe(400);
-    // });
+      const res = await request(app.getHttpServer())
+        .post("/documents/transfer")
+        .send({
+          documentId: "invalid",
+          pendingOwner: "newowner@example.com",
+        });
+
+      expect(res.status).toBe(400);
+
+      // Verify failure metrics were called
+      expect(
+        metricService.updateDocumentTransferFailureMetric,
+      ).toHaveBeenCalled();
+      expect(metricService.pushMetricsToGateway).toHaveBeenCalledWith(
+        "document_transfer_failure",
+        "document_controller",
+      );
+    });
   });
 
   describe("/documents/claim (POST)", () => {
@@ -188,14 +292,6 @@ describe("DocumentController", () => {
       expect(res.status).toBe(201);
       expect(docService.claimDocument).toHaveBeenCalledWith("doc123", "123456");
     });
-
-    // it("should return 400 if fields are missing in claim", async () => {
-    //   const res = await request(app.getHttpServer())
-    //     .post("/documents/claim")
-    //     .send({ documentId: "doc123" });
-
-    //   expect(res.status).toBe(400);
-    // });
   });
 
   describe("/documents/view/:qrId (GET)", () => {
@@ -221,7 +317,7 @@ describe("DocumentController", () => {
         .spyOn(docService, "viewDocument")
         .mockRejectedValue(new NotFoundException("QR code not found"));
       await expect(controller.viewDocument(qrId)).rejects.toThrow(
-        NotFoundException
+        NotFoundException,
       );
     });
   });
@@ -229,12 +325,17 @@ describe("DocumentController", () => {
   describe("/documents/test-error (GET)", () => {
     it("should throw an error and return a 500 status", async () => {
       const res = await request(app.getHttpServer()).get(
-        "/documents/test-error"
+        "/documents/test-error",
       );
 
       // Expect the error handler to catch the error and return 500
       expect(res.status).toBe(500);
       expect(res.body.message).toBe("Internal server error");
+
+      // Verify metric was called
+      expect(
+        metricService.updateDocumentUploadFailureMetric,
+      ).toHaveBeenCalled();
     });
   });
 
@@ -246,7 +347,7 @@ describe("DocumentController", () => {
       mockDocService.requestQrCodeOTP.mockResolvedValue(mockResponse);
 
       const res = await request(app.getHttpServer()).get(
-        `/documents/access/${validQrId}`
+        `/documents/access/${validQrId}`,
       );
 
       expect(res.status).toBe(200);
@@ -258,22 +359,22 @@ describe("DocumentController", () => {
       const invalidQrId = "invalid-uuid";
 
       const res = await request(app.getHttpServer()).get(
-        `/documents/access/${invalidQrId}`
+        `/documents/access/${invalidQrId}`,
       );
 
       expect(res.status).toBe(400);
       expect(res.body.message).toContain(
-        "Validation failed (uuid is expected)"
+        "Validation failed (uuid is expected)",
       );
     });
 
     it("should return appropriate error if service throws", async () => {
       mockDocService.requestQrCodeOTP.mockRejectedValue(
-        new NotFoundException("QR Code not found")
+        new NotFoundException("QR Code not found"),
       );
 
       const res = await request(app.getHttpServer()).get(
-        `/documents/access/${validQrId}`
+        `/documents/access/${validQrId}`,
       );
 
       expect(res.status).toBe(404);
@@ -295,7 +396,7 @@ describe("DocumentController", () => {
       expect(res.body).toEqual({ valid: true });
       expect(docService.validateQrCodeOTP).toHaveBeenCalledWith(
         "123e4567-e89b-12d3-a456-426614174000",
-        "654321"
+        "654321",
       );
     });
 
@@ -310,7 +411,7 @@ describe("DocumentController", () => {
         expect.arrayContaining([
           expect.stringContaining("qrId should not be empty"),
           expect.stringContaining("otp should not be empty"),
-        ])
+        ]),
       );
     });
   });
@@ -331,7 +432,7 @@ describe("DocumentController", () => {
       expect(res.status).toBe(201);
       expect(mockDocService.reverseOwnership).toHaveBeenCalledWith(
         reverseDTO.documentId,
-        reverseDTO.index
+        reverseDTO.index,
       );
     });
 
@@ -349,7 +450,7 @@ describe("DocumentController", () => {
 
     it("should return 500 if service throws unexpected error", async () => {
       mockDocService.reverseOwnership.mockRejectedValue(
-        new Error("Unexpected DB error")
+        new Error("Unexpected DB error"),
       );
 
       const res = await request(app.getHttpServer())
@@ -382,7 +483,10 @@ describe("DocumentController", () => {
       const moduleRef: TestingModule = await Test.createTestingModule({
         imports: [MulterModule.register({})],
         controllers: [DocumentController],
-        providers: [{ provide: DocumentService, useValue: mockDocService }],
+        providers: [
+          { provide: DocumentService, useValue: mockDocService },
+          { provide: MetricService, useValue: mockMetricService },
+        ],
       })
         // stub out both guards so they never run
         .overrideGuard(JwtAuthMiddleware)
@@ -418,19 +522,21 @@ describe("DocumentController", () => {
       };
       mockDocService.getDocument!.mockResolvedValue(payload);
 
-      const res = await request(app.getHttpServer())
-        .get("/documents/get-document/123e4567-e89b-12d3-a456-426614174000");
+      const res = await request(app.getHttpServer()).get(
+        "/documents/get-document/123e4567-e89b-12d3-a456-426614174000",
+      );
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual(payload);
       expect(mockDocService.getDocument).toHaveBeenCalledWith(
-        "123e4567-e89b-12d3-a456-426614174000"
+        "123e4567-e89b-12d3-a456-426614174000",
       );
     });
 
     it("400 on invalid UUID", async () => {
-      const res = await request(app.getHttpServer())
-        .get("/documents/get-document/not-a-uuid");
+      const res = await request(app.getHttpServer()).get(
+        "/documents/get-document/not-a-uuid",
+      );
 
       expect(res.status).toBe(400);
       expect(res.body.message).toContain("Validation failed");
@@ -439,11 +545,12 @@ describe("DocumentController", () => {
 
     it("404 when service throws NotFoundException", async () => {
       mockDocService.getDocument!.mockRejectedValue(
-        new NotFoundException("Doc not found")
+        new NotFoundException("Doc not found"),
       );
 
-      const res = await request(app.getHttpServer())
-        .get("/documents/get-document/123e4567-e89b-12d3-a456-426614174000");
+      const res = await request(app.getHttpServer()).get(
+        "/documents/get-document/123e4567-e89b-12d3-a456-426614174000",
+      );
 
       expect(res.status).toBe(404);
       expect(res.body.message).toBe("Doc not found");
@@ -452,8 +559,9 @@ describe("DocumentController", () => {
     it("500 when service throws generic error", async () => {
       mockDocService.getDocument!.mockRejectedValue(new Error("oops"));
 
-      const res = await request(app.getHttpServer())
-        .get("/documents/get-document/123e4567-e89b-12d3-a456-426614174000");
+      const res = await request(app.getHttpServer()).get(
+        "/documents/get-document/123e4567-e89b-12d3-a456-426614174000",
+      );
 
       expect(res.status).toBe(500);
       expect(res.body.message).toBe("Internal server error");
