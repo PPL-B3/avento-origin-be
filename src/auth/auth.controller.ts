@@ -34,10 +34,16 @@ export class AuthController {
 
     if (result.success) {
       this.metricService.updateLogoutMetric("success", "user");
-      await this.metricService.pushMetricsToGateway(
-        "auth_controller",
-        `logout_${userId}`,
-      );
+
+      // Handle push metrics error gracefully
+      try {
+        await this.metricService.pushMetricsToGateway(
+          "auth_controller",
+          `logout_${userId}`,
+        );
+      } catch (error) {
+        console.error("Failed to push metrics to gateway:", error);
+      }
     }
 
     return result;
@@ -104,10 +110,15 @@ export class AuthController {
       duration,
     );
 
-    await this.metricService.pushMetricsToGateway(
-      "auth_controller",
-      `login_${result.user.id}`,
-    );
+    // Handle push metrics error gracefully
+    try {
+      await this.metricService.pushMetricsToGateway(
+        "auth_controller",
+        `login_${result.user.id}`,
+      );
+    } catch (error) {
+      console.error("Failed to push metrics to gateway:", error);
+    }
 
     return result;
   }
