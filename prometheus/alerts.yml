@@ -1,0 +1,63 @@
+groups:
+  - name: nestjs-http-alerts
+    rules:
+
+      # ——————————————
+      # 1) High 5xx Error Rate by Route
+      # Fires if >5% of requests to any route return 5xx for 5m
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum by(route) (
+              rate(http_requests_total{status=~"5.."}[5m])
+            )
+            /
+            sum by(route) (
+              rate(http_requests_total[5m])
+            )
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.route }}"
+          description: |
+            {{ printf "%.1f" $value }}% of requests to {{ $labels.route }}
+            have returned 5xx in the last 5m.
+
+      # ——————————————
+      # 2) High p95 Latency by Route
+      # Fires if 95th-percentile latency > 500ms for 5m
+      - alert: HighHttpLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by(le,route) (
+              rate(http_request_duration_seconds_bucket[5m])
+            )
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency on {{ $labels.route }}"
+          description: |
+            95th percentile request latency for {{ $labels.route }}
+            is above 500 ms for over 5 minutes.
+
+      # ——————————————
+      # 3) Endpoint Not Receiving Traffic
+      # Fires if no requests to an endpoint for 10m
+      - alert: NoHttpRequests
+        expr: |
+          sum by(route) (
+            rate(http_requests_total[10m])
+          ) == 0
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "No HTTP requests to {{ $labels.route }}"
+          description: |
+            {{ $labels.route }} has received zero requests
+            in the last 10 minutes—could be down or mis-routed.
