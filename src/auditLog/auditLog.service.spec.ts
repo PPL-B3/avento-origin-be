@@ -454,6 +454,31 @@ describe("AuditLogService", () => {
       );
     });
 
+    // New test case for document name filter
+    it("should filter by documentName", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      // Act
+      const result = await service.findAll({ documentName: "report" });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            document: {
+              documentName: {
+                contains: "report",
+                mode: "insensitive",
+              },
+            },
+          },
+        }),
+      );
+    });
+
     it("should apply all filters together when provided", async () => {
       // Arrange
       const mockLogs = [];
@@ -465,6 +490,7 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
       const userId = "user123";
+      const documentName = "report"; // Add document name
 
       // Act
       const result = await service.findAll({
@@ -473,6 +499,7 @@ describe("AuditLogService", () => {
         startDate,
         endDate,
         userId,
+        documentName, // Include documentName in test
       });
 
       // Assert
@@ -495,6 +522,12 @@ describe("AuditLogService", () => {
               lte: endDate,
             },
             userID: userId,
+            document: {
+              documentName: {
+                contains: documentName,
+                mode: "insensitive",
+              },
+            },
           },
         }),
       );
@@ -593,6 +626,27 @@ describe("AuditLogService", () => {
       });
     });
 
+    // New test case for document name filter
+    it("should apply documentName filter to count", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(3);
+
+      // Act
+      const result = await service.count({ documentName: "report" });
+
+      // Assert
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {
+          document: {
+            documentName: {
+              contains: "report",
+              mode: "insensitive",
+            },
+          },
+        },
+      });
+    });
+
     it("should apply all filters together to count when provided", async () => {
       // Arrange
       prismaService.auditLog.count.mockResolvedValue(1);
@@ -602,6 +656,7 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
       const userId = "user123";
+      const documentName = "report"; // Added document name
 
       // Act
       const result = await service.count({
@@ -610,6 +665,7 @@ describe("AuditLogService", () => {
         startDate,
         endDate,
         userId,
+        documentName, // Include documentName in test
       });
 
       // Assert
@@ -631,6 +687,12 @@ describe("AuditLogService", () => {
             lte: endDate,
           },
           userID: userId,
+          document: {
+            documentName: {
+              contains: documentName,
+              mode: "insensitive",
+            },
+          },
         },
       });
     });
