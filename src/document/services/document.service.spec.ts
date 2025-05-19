@@ -186,6 +186,9 @@ describe("DocumentService", () => {
         otp: null,
         otpExpiry: null,
         otpAttemptCount: 0,
+        selfExpiry: new Date(
+          new Date().setFullYear(new Date().getFullYear() + 20)
+        ),
         qrCode: [
           {
             id: "qr1",
@@ -260,6 +263,9 @@ describe("DocumentService", () => {
       otp: "123456",
       otpExpiry: new Date(Date.now() + 5 * 60 * 1000),
       otpAttemptCount: 0,
+      selfExpiry: new Date(
+        new Date().setFullYear(new Date().getFullYear() + 20)
+      ),
       qrCode: [
         {
           id: "qr1",
