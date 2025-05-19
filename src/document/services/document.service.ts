@@ -56,11 +56,9 @@ export class DocumentService {
       filePath: url,
       uploadDate: new Date(),
       publisher: user.email,
-    });
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { uploadCount: { increment: 1 } },
+      selfExpiry: new Date(
+        new Date().setFullYear(new Date().getFullYear() + 20)
+      ),
     });
 
     await this.auditLogService.addAuditLog({
