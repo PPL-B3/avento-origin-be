@@ -10,6 +10,7 @@ interface PaginationParams {
   startDate?: Date;
   endDate?: Date;
   userId?: string;
+  documentName?: string; // Added document name parameter
 }
 
 @Injectable()
@@ -70,6 +71,7 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
+      documentName, // Added parameter
     } = params;
     const skip = (page - 1) * limit;
 
@@ -79,6 +81,7 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
+      documentName, // Pass document name to where clause builder
     );
 
     const auditLogs = await this.prisma.auditLog.findMany({
@@ -119,7 +122,8 @@ export class AuditLogService {
 
   // Fungsi untuk menghitung jumlah audit log berdasarkan filter
   async count(params: PaginationParams) {
-    const { query, eventType, startDate, endDate, userId } = params;
+    const { query, eventType, startDate, endDate, userId, documentName } =
+      params;
 
     const where = this.buildWhereClause(
       query,
@@ -127,6 +131,7 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
+      documentName, // Pass document name to where clause builder
     );
 
     const count = await this.prisma.auditLog.count({ where });
@@ -141,6 +146,7 @@ export class AuditLogService {
     startDate?: Date,
     endDate?: Date,
     userId?: string,
+    documentName?: string, // Added document name parameter
   ): Prisma.AuditLogWhereInput {
     const where: Prisma.AuditLogWhereInput = {};
 
@@ -199,6 +205,16 @@ export class AuditLogService {
     // Filter by user ID
     if (userId) {
       where.userID = userId;
+    }
+
+    // Filter by document name - new filter
+    if (documentName) {
+      where.document = {
+        documentName: {
+          contains: documentName,
+          mode: "insensitive",
+        },
+      };
     }
 
     return where;
