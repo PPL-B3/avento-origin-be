@@ -244,11 +244,33 @@ export class AuditLogService {
       where.timestamp = {};
 
       if (startDate) {
-        where.timestamp.gte = startDate;
+        // Gunakan langsung Date.UTC dengan komponen dari objek Date
+        where.timestamp.gte = new Date(
+          Date.UTC(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            startDate.getDate(),
+            0,
+            0,
+            0,
+            0,
+          ),
+        );
       }
 
       if (endDate) {
-        where.timestamp.lte = endDate;
+        // Gunakan langsung Date.UTC dengan komponen dari objek Date
+        where.timestamp.lte = new Date(
+          Date.UTC(
+            endDate.getFullYear(),
+            endDate.getMonth(),
+            endDate.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ),
+        );
       }
     }
 
