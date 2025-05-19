@@ -53,6 +53,7 @@ export class DocumentService {
 
     const createdDocument = await this.documentRepo.createDocument({
       documentName: dto.documentName,
+      description: "",
       filePath: url,
       uploadDate: new Date(),
       publisher: user.email,
