@@ -99,7 +99,7 @@ export class AuthService {
 
   async login(dto: AuthDto) {
     const key = `login_fail_${dto.email}`;
-    const attempts = (await this.cacheManager.get<number>(key)) || 0;
+    const attempts = (await this.cacheManager.get<number>(key)) ?? 0;
 
     if (attempts >= 3) {
       throw new HttpException(
