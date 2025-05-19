@@ -1,7 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { PrismaService } from "../prisma/prisma.service";
 import { DeepMockProxy, mockDeep } from "jest-mock-extended";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client"; // Impor Role enum dari @prisma/client
 import { AuditLogService } from "./auditLog.service";
 
 describe("AuditLogService", () => {
@@ -169,25 +169,46 @@ describe("AuditLogService", () => {
           document: {
             documentName: "Document 1",
             publisher: "Publisher 1",
+            documentID: "doc1",
+            filePath: "/path/to/doc1",
+            uploadDate: new Date(),
           },
+        },
+      ];
+
+      const mockUsers = [
+        {
+          id: "user1",
+          email: "user1@example.com",
+          role: Role.USER,
+          createdAt: new Date(),
+          password: "hashedpassword",
+          lastLogout: BigInt(1621000000000),
         },
       ];
 
       prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
       prismaService.auditLog.count.mockResolvedValue(1);
+      prismaService.user.findMany.mockResolvedValue(mockUsers);
 
       // Act
       const result = await service.findAll({});
 
       // Assert
-      expect(result).toEqual({
-        data: mockLogs,
-        meta: {
-          total: 1,
-          page: 1,
-          limit: 10,
-          totalPages: 1,
-        },
+      expect(result.data[0]).toHaveProperty("user");
+      expect(result.data[0].user).toEqual({
+        id: "user1",
+        email: "user1@example.com",
+        role: Role.USER,
+        createdAt: expect.any(Date),
+        password: "hashedpassword",
+        lastLogout: expect.any(BigInt),
+      });
+      expect(result.meta).toEqual({
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
       });
 
       expect(prismaService.auditLog.findMany).toHaveBeenCalledWith({
@@ -205,11 +226,27 @@ describe("AuditLogService", () => {
             select: {
               documentName: true,
               publisher: true,
+              documentID: true,
+              filePath: true,
+              uploadDate: true,
             },
           },
         },
         orderBy: {
           timestamp: "desc",
+        },
+      });
+
+      expect(prismaService.user.findMany).toHaveBeenCalledWith({
+        where: {
+          id: {
+            in: ["user1"],
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
         },
       });
     });
@@ -227,25 +264,37 @@ describe("AuditLogService", () => {
           document: {
             documentName: "Document 1",
             publisher: "Publisher 1",
+            documentID: "doc1",
+            filePath: "/path/to/doc1",
+            uploadDate: new Date(),
           },
+        },
+      ];
+
+      const mockUsers = [
+        {
+          id: "user1",
+          email: "user1@example.com",
+          role: Role.USER,
+          createdAt: new Date(),
+          password: "hashedpassword",
+          lastLogout: BigInt(1621000000000),
         },
       ];
 
       prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
       prismaService.auditLog.count.mockResolvedValue(30);
+      prismaService.user.findMany.mockResolvedValue(mockUsers);
 
       // Act
       const result = await service.findAll({ page: 3, limit: 10 });
 
       // Assert
-      expect(result).toEqual({
-        data: mockLogs,
-        meta: {
-          total: 30,
-          page: 3,
-          limit: 10,
-          totalPages: 3,
-        },
+      expect(result.meta).toEqual({
+        total: 30,
+        page: 3,
+        limit: 10,
+        totalPages: 3,
       });
 
       expect(prismaService.auditLog.findMany).toHaveBeenCalledWith({
@@ -263,6 +312,9 @@ describe("AuditLogService", () => {
             select: {
               documentName: true,
               publisher: true,
+              documentID: true,
+              filePath: true,
+              uploadDate: true,
             },
           },
         },
@@ -371,6 +423,18 @@ describe("AuditLogService", () => {
       prismaService.auditLog.count.mockResolvedValue(0);
 
       const startDate = new Date("2023-01-01");
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
 
       // Act
       const result = await service.findAll({ startDate });
@@ -380,7 +444,7 @@ describe("AuditLogService", () => {
         expect.objectContaining({
           where: {
             timestamp: {
-              gte: startDate,
+              gte: startOfDayUTC,
             },
           },
         }),
@@ -394,6 +458,18 @@ describe("AuditLogService", () => {
       prismaService.auditLog.count.mockResolvedValue(0);
 
       const endDate = new Date("2023-01-31");
+      // Gunakan Date.UTC
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
 
       // Act
       const result = await service.findAll({ endDate });
@@ -403,13 +479,14 @@ describe("AuditLogService", () => {
         expect.objectContaining({
           where: {
             timestamp: {
-              lte: endDate,
+              lte: endOfDayUTC,
             },
           },
         }),
       );
     });
 
+    // 3. Update the "should filter by date range with both startDate and endDate" test
     it("should filter by date range with both startDate and endDate", async () => {
       // Arrange
       const mockLogs = [];
@@ -419,6 +496,31 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
 
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
+
       // Act
       const result = await service.findAll({ startDate, endDate });
 
@@ -427,8 +529,8 @@ describe("AuditLogService", () => {
         expect.objectContaining({
           where: {
             timestamp: {
-              gte: startDate,
-              lte: endDate,
+              gte: startOfDayUTC,
+              lte: endOfDayUTC,
             },
           },
         }),
@@ -454,6 +556,31 @@ describe("AuditLogService", () => {
       );
     });
 
+    // New test case for document name filter
+    it("should filter by documentName", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+
+      // Act
+      const result = await service.findAll({ documentName: "report" });
+
+      // Assert
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            document: {
+              documentName: {
+                contains: "report",
+                mode: "insensitive",
+              },
+            },
+          },
+        }),
+      );
+    });
+
     it("should apply all filters together when provided", async () => {
       // Arrange
       const mockLogs = [];
@@ -465,6 +592,32 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
       const userId = "user123";
+      const documentName = "report";
+
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
 
       // Act
       const result = await service.findAll({
@@ -473,6 +626,7 @@ describe("AuditLogService", () => {
         startDate,
         endDate,
         userId,
+        documentName,
       });
 
       // Assert
@@ -491,13 +645,275 @@ describe("AuditLogService", () => {
             ],
             eventType,
             timestamp: {
-              gte: startDate,
-              lte: endDate,
+              gte: startOfDayUTC,
+              lte: endOfDayUTC,
             },
             userID: userId,
+            document: {
+              documentName: {
+                contains: documentName,
+                mode: "insensitive",
+              },
+            },
           },
         }),
       );
+    });
+
+    // New tests for enhanced user data functionality
+    it("should include user data in audit logs response", async () => {
+      // Arrange
+      const mockLogs = [
+        {
+          logID: "1",
+          eventType: "CREATE",
+          timestamp: new Date(),
+          userID: "user1",
+          documentID: "doc1",
+          details: "details1",
+          document: {
+            documentName: "Document 1",
+            publisher: "Publisher 1",
+            documentID: "doc1",
+            filePath: "/path/to/doc1",
+            uploadDate: new Date(),
+          },
+        },
+        {
+          logID: "2",
+          eventType: "UPDATE",
+          timestamp: new Date(),
+          userID: "user2",
+          documentID: "doc2",
+          details: "details2",
+          document: {
+            documentName: "Document 2",
+            publisher: "Publisher 2",
+            documentID: "doc2",
+            filePath: "/path/to/doc2",
+            uploadDate: new Date(),
+          },
+        },
+      ];
+
+      const mockUsers = [
+        {
+          id: "user1",
+          email: "user1@example.com",
+          role: Role.USER,
+          createdAt: new Date(),
+          password: "hashedpassword1",
+          lastLogout: BigInt(1621000000000),
+        },
+        {
+          id: "user2",
+          email: "user2@example.com",
+          role: Role.ADMIN,
+          createdAt: new Date(),
+          password: "hashedpassword2",
+          lastLogout: BigInt(1622000000000),
+        },
+      ];
+
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(2);
+      prismaService.user.findMany.mockResolvedValue(mockUsers);
+
+      // Act
+      const result = await service.findAll({});
+
+      // Assert
+      // Verify the enriched data structure with user information
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0]).toHaveProperty("user");
+      expect(result.data[0].user).toEqual({
+        id: "user1",
+        email: "user1@example.com",
+        role: Role.USER,
+        createdAt: expect.any(Date),
+        password: "hashedpassword1",
+        lastLogout: expect.any(BigInt),
+      });
+      expect(result.data[1].user).toEqual({
+        id: "user2",
+        email: "user2@example.com",
+        role: Role.ADMIN,
+        createdAt: expect.any(Date),
+        password: "hashedpassword2",
+        lastLogout: expect.any(BigInt),
+      });
+
+      // Verify that both Prisma queries were called with correct parameters
+      expect(prismaService.auditLog.findMany).toHaveBeenCalledWith({
+        where: {},
+        skip: 0,
+        take: 10,
+        select: {
+          logID: true,
+          eventType: true,
+          timestamp: true,
+          userID: true,
+          documentID: true,
+          details: true,
+          document: {
+            select: {
+              documentName: true,
+              publisher: true,
+              documentID: true,
+              filePath: true,
+              uploadDate: true,
+            },
+          },
+        },
+        orderBy: {
+          timestamp: "desc",
+        },
+      });
+
+      expect(prismaService.user.findMany).toHaveBeenCalledWith({
+        where: {
+          id: {
+            in: ["user1", "user2"],
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      });
+    });
+
+    // Test when a user doesn't exist in database
+    it("should handle case when user is not found", async () => {
+      // Arrange
+      const mockLogs = [
+        {
+          logID: "1",
+          eventType: "CREATE",
+          timestamp: new Date(),
+          userID: "user1",
+          documentID: "doc1",
+          details: "details1",
+          document: {
+            documentName: "Document 1",
+            publisher: "Publisher 1",
+            documentID: "doc1",
+            filePath: "/path/to/doc1",
+            uploadDate: new Date(),
+          },
+        },
+        {
+          logID: "2",
+          eventType: "UPDATE",
+          timestamp: new Date(),
+          userID: "user2", // This user won't be in the mockUsers array
+          documentID: "doc2",
+          details: "details2",
+          document: {
+            documentName: "Document 2",
+            publisher: "Publisher 2",
+            documentID: "doc2",
+            filePath: "/path/to/doc2",
+            uploadDate: new Date(),
+          },
+        },
+      ];
+
+      const mockUsers = [
+        {
+          id: "user1",
+          email: "user1@example.com",
+          role: Role.USER,
+          createdAt: new Date(),
+          password: "hashedpassword",
+          lastLogout: BigInt(1621000000000),
+        },
+        // user2 is intentionally missing
+      ];
+
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(2);
+      prismaService.user.findMany.mockResolvedValue(mockUsers);
+
+      // Act
+      const result = await service.findAll({});
+
+      // Assert
+      expect(result.data[0].user).toEqual({
+        id: "user1",
+        email: "user1@example.com",
+        role: Role.USER,
+        createdAt: expect.any(Date),
+        password: "hashedpassword",
+        lastLogout: expect.any(BigInt),
+      });
+      expect(result.data[1].user).toBeNull(); // user2 data should be null
+    });
+
+    // Test for logs without document
+    it("should handle logs without associated document", async () => {
+      // Arrange
+      const mockLogs = [
+        {
+          logID: "1",
+          eventType: "LOGIN",
+          timestamp: new Date(),
+          userID: "user1",
+          documentID: null, // No document
+          details: "User logged in",
+          document: null, // Document is null
+        },
+      ];
+
+      const mockUsers = [
+        {
+          id: "user1",
+          email: "user1@example.com",
+          role: Role.USER,
+          createdAt: new Date(),
+          password: "hashedpassword",
+          lastLogout: BigInt(1621000000000),
+        },
+      ];
+
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(1);
+      prismaService.user.findMany.mockResolvedValue(mockUsers);
+
+      // Act
+      const result = await service.findAll({});
+
+      // Assert
+      expect(result.data[0]).toHaveProperty("user");
+      expect(result.data[0].document).toBeNull();
+      expect(result.data[0].user).toEqual({
+        id: "user1",
+        email: "user1@example.com",
+        role: Role.USER,
+        createdAt: expect.any(Date),
+        password: "hashedpassword",
+        lastLogout: expect.any(BigInt),
+      });
+    });
+
+    // Test with empty logs
+    it("should handle empty audit logs results correctly", async () => {
+      // Arrange
+      const mockLogs = [];
+      prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
+      prismaService.auditLog.count.mockResolvedValue(0);
+      // No user.findMany should be called if there are no logs
+
+      // Act
+      const result = await service.findAll({});
+
+      // Assert
+      expect(result.data).toEqual([]);
+      expect(result.meta.total).toBe(0);
+      expect(result.meta.totalPages).toBe(0);
+      // Verify that user.findMany was not called
+      expect(prismaService.user.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -564,6 +980,31 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
 
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
+
       // Act
       const result = await service.count({ startDate, endDate });
 
@@ -571,8 +1012,8 @@ describe("AuditLogService", () => {
       expect(prismaService.auditLog.count).toHaveBeenCalledWith({
         where: {
           timestamp: {
-            gte: startDate,
-            lte: endDate,
+            gte: startOfDayUTC,
+            lte: endOfDayUTC,
           },
         },
       });
@@ -593,6 +1034,27 @@ describe("AuditLogService", () => {
       });
     });
 
+    // New test case for document name filter
+    it("should apply documentName filter to count", async () => {
+      // Arrange
+      prismaService.auditLog.count.mockResolvedValue(3);
+
+      // Act
+      const result = await service.count({ documentName: "report" });
+
+      // Assert
+      expect(prismaService.auditLog.count).toHaveBeenCalledWith({
+        where: {
+          document: {
+            documentName: {
+              contains: "report",
+              mode: "insensitive",
+            },
+          },
+        },
+      });
+    });
+
     it("should apply all filters together to count when provided", async () => {
       // Arrange
       prismaService.auditLog.count.mockResolvedValue(1);
@@ -602,6 +1064,32 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
       const userId = "user123";
+      const documentName = "report";
+
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
 
       // Act
       const result = await service.count({
@@ -610,6 +1098,7 @@ describe("AuditLogService", () => {
         startDate,
         endDate,
         userId,
+        documentName,
       });
 
       // Assert
@@ -627,10 +1116,16 @@ describe("AuditLogService", () => {
           ],
           eventType,
           timestamp: {
-            gte: startDate,
-            lte: endDate,
+            gte: startOfDayUTC,
+            lte: endOfDayUTC,
           },
           userID: userId,
+          document: {
+            documentName: {
+              contains: documentName,
+              mode: "insensitive",
+            },
+          },
         },
       });
     });

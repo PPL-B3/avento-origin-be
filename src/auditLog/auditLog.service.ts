@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 
 interface PaginationParams {
   page?: number;
@@ -10,6 +10,7 @@ interface PaginationParams {
   startDate?: Date;
   endDate?: Date;
   userId?: string;
+  documentName?: string; // Added document name parameter
 }
 
 @Injectable()
@@ -70,6 +71,7 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
+      documentName,
     } = params;
     const skip = (page - 1) * limit;
 
@@ -79,8 +81,10 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
+      documentName,
     );
 
+    // Ambil audit logs seperti biasa
     const auditLogs = await this.prisma.auditLog.findMany({
       where,
       skip,
@@ -96,6 +100,9 @@ export class AuditLogService {
           select: {
             documentName: true,
             publisher: true,
+            documentID: true,
+            filePath: true,
+            uploadDate: true,
           },
         },
       },
@@ -104,10 +111,56 @@ export class AuditLogService {
       },
     });
 
+    // Hitung total logs untuk pagination
     const total = await this.prisma.auditLog.count({ where });
 
+    // Jika tidak ada audit logs, kembalikan data kosong
+    if (auditLogs.length === 0) {
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        },
+      };
+    }
+
+    const userIds = [...new Set(auditLogs.map((log) => log.userID))];
+
+    let users: { id: string; email: string; role: Role }[] = [];
+
+    if (userIds.length > 0) {
+      // Ambil data pengguna untuk semua userID tersebut dalam satu query
+      users = await this.prisma.user.findMany({
+        where: {
+          id: {
+            in: userIds,
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      });
+    }
+
+    // Buat map untuk pengambilan data user yang lebih efisien
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    // Gabungkan data audit log dengan data pengguna
+    const enrichedAuditLogs = auditLogs.map((log) => {
+      const user = userMap.get(log.userID);
+      return {
+        ...log,
+        user: user || null,
+      };
+    });
+
     return {
-      data: auditLogs,
+      data: enrichedAuditLogs,
       meta: {
         total,
         page,
@@ -119,7 +172,8 @@ export class AuditLogService {
 
   // Fungsi untuk menghitung jumlah audit log berdasarkan filter
   async count(params: PaginationParams) {
-    const { query, eventType, startDate, endDate, userId } = params;
+    const { query, eventType, startDate, endDate, userId, documentName } =
+      params;
 
     const where = this.buildWhereClause(
       query,
@@ -127,6 +181,7 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
+      documentName, // Pass document name to where clause builder
     );
 
     const count = await this.prisma.auditLog.count({ where });
@@ -141,6 +196,7 @@ export class AuditLogService {
     startDate?: Date,
     endDate?: Date,
     userId?: string,
+    documentName?: string, // Added document name parameter
   ): Prisma.AuditLogWhereInput {
     const where: Prisma.AuditLogWhereInput = {};
 
@@ -188,17 +244,49 @@ export class AuditLogService {
       where.timestamp = {};
 
       if (startDate) {
-        where.timestamp.gte = startDate;
+        // Gunakan langsung Date.UTC dengan komponen dari objek Date
+        where.timestamp.gte = new Date(
+          Date.UTC(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            startDate.getDate(),
+            0,
+            0,
+            0,
+            0,
+          ),
+        );
       }
 
       if (endDate) {
-        where.timestamp.lte = endDate;
+        // Gunakan langsung Date.UTC dengan komponen dari objek Date
+        where.timestamp.lte = new Date(
+          Date.UTC(
+            endDate.getFullYear(),
+            endDate.getMonth(),
+            endDate.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ),
+        );
       }
     }
 
     // Filter by user ID
     if (userId) {
       where.userID = userId;
+    }
+
+    // Filter by document name - new filter
+    if (documentName) {
+      where.document = {
+        documentName: {
+          contains: documentName,
+          mode: "insensitive",
+        },
+      };
     }
 
     return where;
