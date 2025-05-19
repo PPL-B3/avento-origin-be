@@ -178,6 +178,7 @@ describe("DocumentService", () => {
       repo.findDocumentById.mockResolvedValue({
         documentID: "doc-id",
         documentName: "My Doc",
+        description: "My Doc Description",
         filePath: "url",
         uploadDate: new Date(),
         publisher: "Alice",
@@ -255,6 +256,7 @@ describe("DocumentService", () => {
     const baseDoc = {
       documentID: "doc-id",
       documentName: "My Doc",
+      description: "My Doc Description",
       filePath: "url",
       uploadDate: new Date(),
       publisher: "Alice",
