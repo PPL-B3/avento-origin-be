@@ -423,6 +423,18 @@ describe("AuditLogService", () => {
       prismaService.auditLog.count.mockResolvedValue(0);
 
       const startDate = new Date("2023-01-01");
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
 
       // Act
       const result = await service.findAll({ startDate });
@@ -432,7 +444,7 @@ describe("AuditLogService", () => {
         expect.objectContaining({
           where: {
             timestamp: {
-              gte: startDate,
+              gte: startOfDayUTC,
             },
           },
         }),
@@ -446,6 +458,18 @@ describe("AuditLogService", () => {
       prismaService.auditLog.count.mockResolvedValue(0);
 
       const endDate = new Date("2023-01-31");
+      // Gunakan Date.UTC
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
 
       // Act
       const result = await service.findAll({ endDate });
@@ -455,13 +479,14 @@ describe("AuditLogService", () => {
         expect.objectContaining({
           where: {
             timestamp: {
-              lte: endDate,
+              lte: endOfDayUTC,
             },
           },
         }),
       );
     });
 
+    // 3. Update the "should filter by date range with both startDate and endDate" test
     it("should filter by date range with both startDate and endDate", async () => {
       // Arrange
       const mockLogs = [];
@@ -471,6 +496,31 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
 
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
+
       // Act
       const result = await service.findAll({ startDate, endDate });
 
@@ -479,8 +529,8 @@ describe("AuditLogService", () => {
         expect.objectContaining({
           where: {
             timestamp: {
-              gte: startDate,
-              lte: endDate,
+              gte: startOfDayUTC,
+              lte: endOfDayUTC,
             },
           },
         }),
@@ -542,7 +592,32 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
       const userId = "user123";
-      const documentName = "report"; // Add document name
+      const documentName = "report";
+
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
 
       // Act
       const result = await service.findAll({
@@ -551,7 +626,7 @@ describe("AuditLogService", () => {
         startDate,
         endDate,
         userId,
-        documentName, // Include documentName in test
+        documentName,
       });
 
       // Assert
@@ -570,8 +645,8 @@ describe("AuditLogService", () => {
             ],
             eventType,
             timestamp: {
-              gte: startDate,
-              lte: endDate,
+              gte: startOfDayUTC,
+              lte: endOfDayUTC,
             },
             userID: userId,
             document: {
@@ -905,6 +980,31 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
 
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
+
       // Act
       const result = await service.count({ startDate, endDate });
 
@@ -912,8 +1012,8 @@ describe("AuditLogService", () => {
       expect(prismaService.auditLog.count).toHaveBeenCalledWith({
         where: {
           timestamp: {
-            gte: startDate,
-            lte: endDate,
+            gte: startOfDayUTC,
+            lte: endOfDayUTC,
           },
         },
       });
@@ -964,7 +1064,32 @@ describe("AuditLogService", () => {
       const startDate = new Date("2023-01-01");
       const endDate = new Date("2023-01-31");
       const userId = "user123";
-      const documentName = "report"; // Added document name
+      const documentName = "report";
+
+      // Gunakan Date.UTC
+      const startOfDayUTC = new Date(
+        Date.UTC(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate(),
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
+
+      const endOfDayUTC = new Date(
+        Date.UTC(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
 
       // Act
       const result = await service.count({
@@ -973,7 +1098,7 @@ describe("AuditLogService", () => {
         startDate,
         endDate,
         userId,
-        documentName, // Include documentName in test
+        documentName,
       });
 
       // Assert
@@ -991,8 +1116,8 @@ describe("AuditLogService", () => {
           ],
           eventType,
           timestamp: {
-            gte: startDate,
-            lte: endDate,
+            gte: startOfDayUTC,
+            lte: endOfDayUTC,
           },
           userID: userId,
           document: {
