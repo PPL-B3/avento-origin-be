@@ -31,6 +31,7 @@ export class AuditLogController {
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
     @Query("userId") userId?: string,
+    @Query("documentName") documentName?: string, // Added document name parameter
   ) {
     return this.auditLogService.findAll({
       page,
@@ -40,6 +41,7 @@ export class AuditLogController {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       userId,
+      documentName, // Pass document name to service
     });
   }
 
@@ -50,6 +52,7 @@ export class AuditLogController {
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
     @Query("userId") userId?: string,
+    @Query("documentName") documentName?: string, // Added document name parameter
   ) {
     return this.auditLogService.count({
       query,
@@ -57,6 +60,7 @@ export class AuditLogController {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       userId,
+      documentName,
     });
   }
 }
