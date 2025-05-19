@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 
 interface PaginationParams {
   page?: number;
@@ -71,7 +71,7 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
-      documentName, // Added parameter
+      documentName,
     } = params;
     const skip = (page - 1) * limit;
 
@@ -81,9 +81,10 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
-      documentName, // Pass document name to where clause builder
+      documentName,
     );
 
+    // Ambil audit logs seperti biasa
     const auditLogs = await this.prisma.auditLog.findMany({
       where,
       skip,
@@ -99,6 +100,9 @@ export class AuditLogService {
           select: {
             documentName: true,
             publisher: true,
+            documentID: true,
+            filePath: true,
+            uploadDate: true,
           },
         },
       },
@@ -107,10 +111,56 @@ export class AuditLogService {
       },
     });
 
+    // Hitung total logs untuk pagination
     const total = await this.prisma.auditLog.count({ where });
 
+    // Jika tidak ada audit logs, kembalikan data kosong
+    if (auditLogs.length === 0) {
+      return {
+        data: [],
+        meta: {
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        },
+      };
+    }
+
+    const userIds = [...new Set(auditLogs.map((log) => log.userID))];
+
+    let users: { id: string; email: string; role: Role }[] = [];
+
+    if (userIds.length > 0) {
+      // Ambil data pengguna untuk semua userID tersebut dalam satu query
+      users = await this.prisma.user.findMany({
+        where: {
+          id: {
+            in: userIds,
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      });
+    }
+
+    // Buat map untuk pengambilan data user yang lebih efisien
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    // Gabungkan data audit log dengan data pengguna
+    const enrichedAuditLogs = auditLogs.map((log) => {
+      const user = userMap.get(log.userID);
+      return {
+        ...log,
+        user: user || null,
+      };
+    });
+
     return {
-      data: auditLogs,
+      data: enrichedAuditLogs,
       meta: {
         total,
         page,
