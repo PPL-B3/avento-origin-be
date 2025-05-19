@@ -27,6 +27,7 @@ CREATE TABLE "users" (
 CREATE TABLE "Document" (
     "documentID" TEXT NOT NULL,
     "documentName" TEXT NOT NULL,
+    "description" TEXT,
     "filePath" TEXT NOT NULL,
     "uploadDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publisher" TEXT NOT NULL,
