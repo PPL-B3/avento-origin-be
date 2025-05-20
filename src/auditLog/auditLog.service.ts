@@ -163,11 +163,11 @@ export class AuditLogService {
         documentID: log.documentID,
         details: log.details,
         // Tambahkan data user langsung ke objek utama (jika ada)
-        id: user?.id || null,
-        email: user?.email || null,
-        role: user?.role || null,
+        id: user?.id ?? null,
+        email: user?.email ?? null,
+        role: user?.role ?? null,
         // Tambahkan data document langsung ke objek utama (jika ada)
-        documentName: log.document?.documentName || null,
+        documentName: log.document?.documentName ?? null,
       };
     });
 
