@@ -10,7 +10,7 @@ interface PaginationParams {
   startDate?: Date;
   endDate?: Date;
   userId?: string;
-  documentName?: string; // Added document name parameter
+  documentName?: string;
 }
 
 @Injectable()
@@ -61,7 +61,7 @@ export class AuditLogService {
     });
   }
 
-  // Fungsi untuk mencari audit log dengan pagination dan filter
+  // Fungsi untuk mencari audit log dengan pagination dan filter (yang dimodifikasi)
   async findAll(params: PaginationParams) {
     const {
       page = 1,
@@ -150,12 +150,24 @@ export class AuditLogService {
     // Buat map untuk pengambilan data user yang lebih efisien
     const userMap = new Map(users.map((user) => [user.id, user]));
 
-    // Gabungkan data audit log dengan data pengguna
+    // Gabungkan data audit log dengan data pengguna (format diubah - tidak nested)
     const enrichedAuditLogs = auditLogs.map((log) => {
       const user = userMap.get(log.userID);
+
+      // Buat objek dengan struktur yang diinginkan (tidak ada nested user dan document)
       return {
-        ...log,
-        user: user || null,
+        logID: log.logID,
+        eventType: log.eventType,
+        timestamp: log.timestamp,
+        userID: log.userID,
+        documentID: log.documentID,
+        details: log.details,
+        // Tambahkan data user langsung ke objek utama (jika ada)
+        id: user?.id || null,
+        email: user?.email || null,
+        role: user?.role || null,
+        // Tambahkan data document langsung ke objek utama (jika ada)
+        documentName: log.document?.documentName || null,
       };
     });
 
@@ -181,7 +193,7 @@ export class AuditLogService {
       startDate,
       endDate,
       userId,
-      documentName, // Pass document name to where clause builder
+      documentName,
     );
 
     const count = await this.prisma.auditLog.count({ where });
@@ -196,7 +208,7 @@ export class AuditLogService {
     startDate?: Date,
     endDate?: Date,
     userId?: string,
-    documentName?: string, // Added document name parameter
+    documentName?: string,
   ): Prisma.AuditLogWhereInput {
     const where: Prisma.AuditLogWhereInput = {};
 
@@ -279,7 +291,7 @@ export class AuditLogService {
       where.userID = userId;
     }
 
-    // Filter by document name - new filter
+    // Filter by document name
     if (documentName) {
       where.document = {
         documentName: {
