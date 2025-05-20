@@ -195,15 +195,12 @@ describe("AuditLogService", () => {
       const result = await service.findAll({});
 
       // Assert
-      expect(result.data[0]).toHaveProperty("user");
-      expect(result.data[0].user).toEqual({
-        id: "user1",
-        email: "user1@example.com",
-        role: Role.USER,
-        createdAt: expect.any(Date),
-        password: "hashedpassword",
-        lastLogout: expect.any(BigInt),
-      });
+      // Periksa data tanpa nested user (data diratakan)
+      expect(result.data[0]).toHaveProperty("id", "user1");
+      expect(result.data[0]).toHaveProperty("email", "user1@example.com");
+      expect(result.data[0]).toHaveProperty("role", Role.USER);
+      expect(result.data[0]).toHaveProperty("documentName", "Document 1");
+
       expect(result.meta).toEqual({
         total: 1,
         page: 1,
@@ -723,27 +720,19 @@ describe("AuditLogService", () => {
       const result = await service.findAll({});
 
       // Assert
-      // Verify the enriched data structure with user information
+      // Periksa struktur data yang sudah diratakan (flattened)
       expect(result.data).toHaveLength(2);
-      expect(result.data[0]).toHaveProperty("user");
-      expect(result.data[0].user).toEqual({
-        id: "user1",
-        email: "user1@example.com",
-        role: Role.USER,
-        createdAt: expect.any(Date),
-        password: "hashedpassword1",
-        lastLogout: expect.any(BigInt),
-      });
-      expect(result.data[1].user).toEqual({
-        id: "user2",
-        email: "user2@example.com",
-        role: Role.ADMIN,
-        createdAt: expect.any(Date),
-        password: "hashedpassword2",
-        lastLogout: expect.any(BigInt),
-      });
+      expect(result.data[0]).toHaveProperty("id", "user1");
+      expect(result.data[0]).toHaveProperty("email", "user1@example.com");
+      expect(result.data[0]).toHaveProperty("role", Role.USER);
+      expect(result.data[0]).toHaveProperty("documentName", "Document 1");
 
-      // Verify that both Prisma queries were called with correct parameters
+      expect(result.data[1]).toHaveProperty("id", "user2");
+      expect(result.data[1]).toHaveProperty("email", "user2@example.com");
+      expect(result.data[1]).toHaveProperty("role", Role.ADMIN);
+      expect(result.data[1]).toHaveProperty("documentName", "Document 2");
+
+      // Verifikasi bahwa kedua query Prisma dipanggil dengan parameter yang benar
       expect(prismaService.auditLog.findMany).toHaveBeenCalledWith({
         where: {},
         skip: 0,
@@ -807,7 +796,7 @@ describe("AuditLogService", () => {
           logID: "2",
           eventType: "UPDATE",
           timestamp: new Date(),
-          userID: "user2", // This user won't be in the mockUsers array
+          userID: "user2", // User ini tidak ada di mockUsers array
           documentID: "doc2",
           details: "details2",
           document: {
@@ -829,7 +818,7 @@ describe("AuditLogService", () => {
           password: "hashedpassword",
           lastLogout: BigInt(1621000000000),
         },
-        // user2 is intentionally missing
+        // user2 sengaja tidak disertakan
       ];
 
       prismaService.auditLog.findMany.mockResolvedValue(mockLogs);
@@ -840,15 +829,15 @@ describe("AuditLogService", () => {
       const result = await service.findAll({});
 
       // Assert
-      expect(result.data[0].user).toEqual({
-        id: "user1",
-        email: "user1@example.com",
-        role: Role.USER,
-        createdAt: expect.any(Date),
-        password: "hashedpassword",
-        lastLogout: expect.any(BigInt),
-      });
-      expect(result.data[1].user).toBeNull(); // user2 data should be null
+      // User pertama seharusnya memiliki field user
+      expect(result.data[0]).toHaveProperty("id", "user1");
+      expect(result.data[0]).toHaveProperty("email", "user1@example.com");
+      expect(result.data[0]).toHaveProperty("role", Role.USER);
+
+      // User kedua seharusnya memiliki field user bernilai null
+      expect(result.data[1]).toHaveProperty("id", null);
+      expect(result.data[1]).toHaveProperty("email", null);
+      expect(result.data[1]).toHaveProperty("role", null);
     });
 
     // Test for logs without document
@@ -860,9 +849,9 @@ describe("AuditLogService", () => {
           eventType: "LOGIN",
           timestamp: new Date(),
           userID: "user1",
-          documentID: null, // No document
+          documentID: null, // Tidak ada dokumen
           details: "User logged in",
-          document: null, // Document is null
+          document: null, // Document adalah null
         },
       ];
 
@@ -885,16 +874,10 @@ describe("AuditLogService", () => {
       const result = await service.findAll({});
 
       // Assert
-      expect(result.data[0]).toHaveProperty("user");
-      expect(result.data[0].document).toBeNull();
-      expect(result.data[0].user).toEqual({
-        id: "user1",
-        email: "user1@example.com",
-        role: Role.USER,
-        createdAt: expect.any(Date),
-        password: "hashedpassword",
-        lastLogout: expect.any(BigInt),
-      });
+      expect(result.data[0]).toHaveProperty("id", "user1");
+      expect(result.data[0]).toHaveProperty("email", "user1@example.com");
+      expect(result.data[0]).toHaveProperty("role", Role.USER);
+      expect(result.data[0]).toHaveProperty("documentName", null);
     });
 
     // Test with empty logs
