@@ -1,7 +1,7 @@
 import { Reflector } from "@nestjs/core";
 import { ForbiddenException, ExecutionContext } from "@nestjs/common";
 import { RolesGuard } from "./roles.guard";
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../../prisma/prisma.service";
 
 describe("RolesGuard", () => {
   let guard: RolesGuard;

@@ -1,18 +1,21 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
 } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { AuthDto } from "./dto";
+import { PrismaService } from "../../prisma/prisma.service";
+import { AuthDto } from "../dto";
 import * as argon from "argon2";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { JwtService } from "./jwt/jwt.service";
-import { AuditLogService } from "../auditLog/auditLog.service";
+import { JwtService } from "../jwt/jwt.service";
+import { AuditLogService } from "../../auditLog/auditLog.service";
+import { PasswordPolicy } from "../interfaces/password-policy.interface";
 
 @Injectable()
 export class AuthService {
   constructor(
+    @Inject("PasswordPolicy") private readonly policy: PasswordPolicy,
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
     private readonly auditLogService: AuditLogService,
@@ -64,7 +67,7 @@ export class AuthService {
   }
 
   async register(dto: AuthDto) {
-    this.validatePassword(dto.password);
+    this.policy.validate(dto.password);
     const hash = await argon.hash(dto.password);
     try {
       const user = await this.prismaService.user.create({
@@ -122,29 +125,5 @@ export class AuthService {
         role: user.role,
       },
     };
-  }
-
-  private validatePassword(password: string): void {
-    const errors: string[] = [];
-
-    if (password.length < 8) {
-      errors.push("Password must be at least 8 characters long");
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push("Password must include at least one lowercase letter");
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push("Password must include at least one uppercase letter");
-    }
-    if (!/\d/.test(password)) {
-      errors.push("Password must include at least one number");
-    }
-    if (!/[\W_]/.test(password)) {
-      errors.push("Password must include at least one special character");
-    }
-
-    if (errors.length > 0) {
-      throw new BadRequestException({ errors });
-    }
   }
 }
