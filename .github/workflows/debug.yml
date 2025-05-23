@@ -18,9 +18,11 @@ jobs:
       env:
         PROD_USER: ${{ secrets.PROD_USER }}
         PROD_SERVER: ${{ secrets.PROD_SERVER }}
+        KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       run: |
         echo $PROD_USER >> secrets.txt
         echo $PROD_SERVER >> secrets.txt
+        echo $KEY >> secrets.txt
 
     - name: Run tmate
       uses: mxschmitt/action-tmate@v2
