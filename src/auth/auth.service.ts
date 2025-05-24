@@ -1,6 +1,9 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Inject,
   Injectable,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
@@ -9,6 +12,8 @@ import * as argon from "argon2";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "./jwt/jwt.service";
 import { AuditLogService } from "../auditLog/auditLog.service";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 
 @Injectable()
 export class AuthService {
@@ -16,6 +21,7 @@ export class AuthService {
     private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
     private readonly auditLogService: AuditLogService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   /**
@@ -92,6 +98,16 @@ export class AuthService {
   }
 
   async login(dto: AuthDto) {
+    const key = `login_fail_${dto.email}`;
+    const attempts = (await this.cacheManager.get<number>(key)) ?? 0;
+
+    if (attempts >= 3) {
+      throw new HttpException(
+        "Too many attempts, try again in another minute",
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const user = await this.prismaService.user.findUnique({
       where: {
         email: dto.email,
@@ -103,8 +119,11 @@ export class AuthService {
 
     const passwordMatches = await argon.verify(user.password, dto.password);
     if (!passwordMatches) {
+      await this.cacheManager.set(key, attempts + 1, 60000);
       throw new ForbiddenException("Username or password is incorrect");
     }
+
+    await this.cacheManager.del(key);
 
     const token = this.jwtService.generateToken({ userId: user.id });
 

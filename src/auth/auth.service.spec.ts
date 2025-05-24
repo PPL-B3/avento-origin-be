@@ -3,16 +3,24 @@ import { AuthService } from "./auth.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthDto } from "./dto";
 import * as argon from "argon2";
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+} from "@nestjs/common";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { JwtService } from "./jwt/jwt.service";
 import { AuditLogService } from "../auditLog/auditLog.service";
 import { Role } from "@prisma/client";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 
 describe("AuthService", () => {
   let authService: AuthService;
   let prismaService: PrismaService;
   let auditLogService: AuditLogService;
+  let cacheManager: Cache;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,12 +48,21 @@ describe("AuthService", () => {
             addAuditLog: jest.fn(),
           },
         },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     authService = module.get<AuthService>(AuthService);
     prismaService = module.get<PrismaService>(PrismaService);
     auditLogService = module.get<AuditLogService>(AuditLogService);
+    cacheManager = module.get<Cache>(CACHE_MANAGER);
   });
 
   afterEach(() => {
@@ -392,6 +409,71 @@ describe("AuthService", () => {
       expect(result).toEqual({
         success: true,
         message: "Berhasil logout",
+      });
+    });
+  });
+
+  describe("AuthService (brute-force)", () => {
+    const dto: AuthDto = {
+      email: "test@example.com",
+      password: "wrongpassword",
+    };
+
+    const mockUser = {
+      id: "123",
+      email: dto.email,
+      password: "hashedpassword",
+      role: Role.USER,
+      lastLogout: BigInt(Date.now()),
+      createdAt: new Date(),
+    };
+
+    afterEach(() => jest.clearAllMocks());
+
+    describe("brute-force prevention", () => {
+      it("throws 429 when attempts ≥ 3", async () => {
+        (cacheManager.get as jest.Mock).mockResolvedValue(3);
+        await expect(authService.login(dto)).rejects.toThrow(HttpException);
+        await expect(authService.login(dto)).rejects.toMatchObject({
+          status: HttpStatus.TOO_MANY_REQUESTS,
+          message: "Too many attempts, try again in another minute",
+        });
+      });
+
+      it("increments counter on wrong password", async () => {
+        (cacheManager.get as jest.Mock).mockResolvedValue(1);
+        jest
+          .spyOn(prismaService.user, "findUnique")
+          .mockResolvedValue(mockUser);
+        jest.spyOn(argon, "verify").mockResolvedValue(false);
+
+        await expect(authService.login(dto)).rejects.toThrow(
+          ForbiddenException,
+        );
+
+        expect(cacheManager.set).toHaveBeenCalledWith(
+          `login_fail_${dto.email}`,
+          2,
+          60000,
+        );
+      });
+
+      it("clears counter on successful login", async () => {
+        (cacheManager.get as jest.Mock).mockResolvedValue(2);
+        jest
+          .spyOn(prismaService.user, "findUnique")
+          .mockResolvedValue(mockUser);
+        jest.spyOn(argon, "verify").mockResolvedValue(true);
+
+        const res = await authService.login(dto);
+
+        expect(cacheManager.del).toHaveBeenCalledWith(
+          `login_fail_${dto.email}`,
+        );
+        expect(res).toEqual({
+          access_token: "mocked-jwt-token",
+          user: { id: mockUser.id, email: mockUser.email, role: mockUser.role },
+        });
       });
     });
   });

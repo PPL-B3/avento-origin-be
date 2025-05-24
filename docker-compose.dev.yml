@@ -19,6 +19,8 @@ services:
       - GMAIL_USER
       - GMAIL_PASS
       - FE_URL=http://localhost:3000
+      - ADMIN_EMAIL
+      - ADMIN_PASSWORD
     ports:
       - "4000:4000"
 

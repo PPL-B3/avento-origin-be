@@ -16,6 +16,8 @@ import { AuditLogModule } from "./auditLog/auditLog.module";
 import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 import { RolesGuard } from "./auth/roles.guard";
 import { AdminSeederService } from "./auth/adminseeder.service";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { CacheModule } from "@nestjs/cache-manager";
 
 @Module({
   imports: [
@@ -28,9 +30,22 @@ import { AdminSeederService } from "./auth/adminseeder.service";
       isGlobal: true,
     }),
     AuditLogModule,
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 10,
+        },
+      ],
+    }),
+    CacheModule.register({
+      ttl: 60000,
+      isGlobal: true,
+    }),
   ],
   providers: [
     PrismaService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     AdminSeederService,
   ],
