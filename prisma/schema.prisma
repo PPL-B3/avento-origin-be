@@ -42,6 +42,7 @@ model User {
 
 model Document {
   documentID   String   @id @default(uuid())
+  mimetype     String
   documentName String
   description  String?
   filePath     String

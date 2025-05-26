@@ -26,6 +26,7 @@ CREATE TABLE "users" (
 -- CreateTable
 CREATE TABLE "Document" (
     "documentID" TEXT NOT NULL,
+    "mimetype" TEXT NOT NULL,
     "documentName" TEXT NOT NULL,
     "description" TEXT,
     "filePath" TEXT NOT NULL,
