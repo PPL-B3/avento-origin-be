@@ -53,9 +53,15 @@ export class DocumentService {
 
     const createdDocument = await this.documentRepo.createDocument({
       documentName: dto.documentName,
+      mimetype: pdf.mimetype,
+      description: "",
       filePath: url,
       uploadDate: new Date(),
       publisher: user.email,
+      size: pdf.size,
+      selfExpiry: new Date(
+        new Date().setFullYear(new Date().getFullYear() + 20)
+      ),
     });
 
     await this.auditLogService.addAuditLog({
@@ -344,6 +350,15 @@ export class DocumentService {
     // Include filePath only if the requested QR code is private.
     if (qrCode.isPrivate) {
       response.filePath = document.filePath;
+    } else {
+      await this.prisma.document.update({
+        where: { documentID: document.documentID },
+        data: {
+          publicViewCount: {
+            increment: 1,
+          },
+        },
+      });
     }
 
     return response;
