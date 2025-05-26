@@ -28,11 +28,12 @@ model Message {
 }
 
 model User {
-  id         String @id @default(uuid())
-  createdAt  DateTime @default(now())
-  email      String @unique
+  id         String    @id @default(uuid())
+  createdAt  DateTime  @default(now())
+  email      String    @unique
   password   String
-  role       Role @default(USER)
+  role       Role      @default(USER)
+  uploadCount Int  @default(0)
   lastLogout BigInt
 
   @@map("users")
@@ -42,11 +43,14 @@ model User {
 model Document {
   documentID   String   @id @default(uuid())
   documentName String
+  description  String?
   filePath     String
   uploadDate   DateTime @default(now())
   publisher    String
   qrCode       QrCode[]
+  publicViewCount Int   @default(0)
   AuditLog     AuditLog[]
+  selfExpiry   DateTime?
 
   pendingOwner    String?
   otp             String?
