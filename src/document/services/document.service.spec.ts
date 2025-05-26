@@ -187,6 +187,7 @@ describe("DocumentService", () => {
         otp: null,
         otpExpiry: null,
         otpAttemptCount: 0,
+        size: 1024,
         selfExpiry: new Date(
           new Date().setFullYear(new Date().getFullYear() + 20)
         ),
@@ -265,6 +266,7 @@ describe("DocumentService", () => {
       otp: "123456",
       otpExpiry: new Date(Date.now() + 5 * 60 * 1000),
       otpAttemptCount: 0,
+      size: 1024,
       selfExpiry: new Date(
         new Date().setFullYear(new Date().getFullYear() + 20)
       ),
