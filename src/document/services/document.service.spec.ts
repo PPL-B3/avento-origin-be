@@ -177,6 +177,7 @@ describe("DocumentService", () => {
       // Mock return dari findDocumentById
       repo.findDocumentById.mockResolvedValue({
         documentID: "doc-id",
+        mimetype: "application/pdf",
         documentName: "My Doc",
         description: "My Doc Description",
         filePath: "url",
@@ -256,6 +257,7 @@ describe("DocumentService", () => {
   describe("claimDocument", () => {
     const baseDoc = {
       documentID: "doc-id",
+      mimetype: "application/pdf",
       documentName: "My Doc",
       description: "My Doc Description",
       filePath: "url",

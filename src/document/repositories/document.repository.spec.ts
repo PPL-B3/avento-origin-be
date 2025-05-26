@@ -37,6 +37,7 @@ describe("DocumentRepository", () => {
   describe("createDocument", () => {
     const createInput: Prisma.DocumentCreateInput = {
       documentName: "Test Doc",
+      mimetype: "application/pdf",
       filePath: "/path/to/file",
       publisher: "publisher@example.com",
       size: 1024,
@@ -281,6 +282,7 @@ describe("DocumentRepository", () => {
       ]);
       const createInput: Prisma.DocumentCreateInput = {
         documentName: "Test Doc",
+        mimetype: "application/pdf",
         filePath: "/path/to/file",
         publisher: "testOwner",
         size: 1024,

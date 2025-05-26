@@ -31,6 +31,7 @@ CREATE TABLE "Document" (
     "filePath" TEXT NOT NULL,
     "uploadDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publisher" TEXT NOT NULL,
+    "size" INTEGER NOT NULL,
     "publicViewCount" INTEGER NOT NULL DEFAULT 0,
     "selfExpiry" TIMESTAMP(3),
     "pendingOwner" TEXT,
