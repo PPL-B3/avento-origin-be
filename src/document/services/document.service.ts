@@ -57,6 +57,7 @@ export class DocumentService {
       filePath: url,
       uploadDate: new Date(),
       publisher: user.email,
+      size: pdf.size,
       selfExpiry: new Date(
         new Date().setFullYear(new Date().getFullYear() + 20)
       ),
