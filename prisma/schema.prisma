@@ -48,6 +48,7 @@ model Document {
   uploadDate   DateTime @default(now())
   publisher    String
   qrCode       QrCode[]
+  size         Int
   publicViewCount Int   @default(0)
   AuditLog     AuditLog[]
   selfExpiry   DateTime?
