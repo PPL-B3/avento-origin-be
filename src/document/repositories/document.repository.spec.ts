@@ -39,6 +39,7 @@ describe("DocumentRepository", () => {
       documentName: "Test Doc",
       filePath: "/path/to/file",
       publisher: "publisher@example.com",
+      size: 1024,
     };
 
     it("should create a document and attach QR codes successfully", async () => {
@@ -198,7 +199,7 @@ describe("DocumentRepository", () => {
         .mockResolvedValueOnce({ id: "new-private", isPrivate: true })
         .mockResolvedValueOnce({ id: "dummy-qr", isPrivate: true });
       await expect(
-        repo.changeOwnership(fakeTransaction, newOwner, documentId),
+        repo.changeOwnership(fakeTransaction, newOwner, documentId)
       ).rejects.toThrow("Failed creating private and/or public QR codes.");
     });
   });
@@ -282,6 +283,7 @@ describe("DocumentRepository", () => {
         documentName: "Test Doc",
         filePath: "/path/to/file",
         publisher: "testOwner",
+        size: 1024,
       };
       fakeTransaction.document.create.mockResolvedValue({
         documentID: "doc-123",
@@ -293,7 +295,11 @@ describe("DocumentRepository", () => {
       fakeTransaction.document.update.mockResolvedValue({});
       const result = await repo.createDocument(createInput);
       expect(createQrCodeBatchSpy).toHaveBeenCalledWith("testOwner", "doc-123");
-      expect(result).toEqual({ privateId: "qr-2", publicId: "qr-1", documentId: "doc-123" });
+      expect(result).toEqual({
+        privateId: "qr-2",
+        publicId: "qr-1",
+        documentId: "doc-123",
+      });
     });
   });
 });
