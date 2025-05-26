@@ -12,6 +12,8 @@ import { randomInt } from "crypto";
 import { PrismaService } from "../../prisma/prisma.service";
 import { PostHogService } from "../../posthog/posthog.service";
 import { AuditLogService } from "../../auditLog/auditLog.service";
+import { InjectMetric } from "@willsoto/nestjs-prometheus";
+import { Counter } from "prom-client";
 
 @Injectable()
 export class DocumentService {
@@ -22,7 +24,9 @@ export class DocumentService {
     private readonly configService: ConfigService,
     private readonly posthogService: PostHogService,
     private readonly prisma: PrismaService,
-    private readonly auditLogService: AuditLogService
+    private readonly auditLogService: AuditLogService,
+    @InjectMetric("documents_operations_total")
+    private readonly docsCounter: Counter<string>,
   ) {}
 
   async uploadDocument(
@@ -64,6 +68,8 @@ export class DocumentService {
       details: `Document "${dto.documentName}" uploaded.`,
       documentID: createdDocument.documentId,
     });
+
+    this.docsCounter.inc({ operation: 'upload' });
 
     return {
       privateId: createdDocument.privateId,
@@ -178,6 +184,8 @@ export class DocumentService {
         documentID: documentId,
       });
     }
+
+    this.docsCounter.inc({ operation: "transfer" });
 
     await this.emailService.sendOwnershipTransferEmail(
       pendingOwner,

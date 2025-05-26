@@ -21,7 +21,9 @@ describe("AdminSeederService", () => {
   });
 
   it("skips seeding if env vars missing", async () => {
-    (config.get as jest.Mock).mockReturnValueOnce(undefined).mockReturnValueOnce(undefined);
+    (config.get as jest.Mock)
+      .mockReturnValueOnce(undefined)
+      .mockReturnValueOnce(undefined);
     console.warn = jest.fn();
     await service.onModuleInit();
     expect(prisma.user.findUnique).not.toHaveBeenCalled();
@@ -30,15 +32,21 @@ describe("AdminSeederService", () => {
   });
 
   it("does not create if admin already exists", async () => {
-    (config.get as jest.Mock).mockReturnValueOnce(adminEmail).mockReturnValueOnce(adminPass);
+    (config.get as jest.Mock)
+      .mockReturnValueOnce(adminEmail)
+      .mockReturnValueOnce(adminPass);
     prisma.user.findUnique.mockResolvedValue({ id: "1", role: "ADMIN" });
     await service.onModuleInit();
-    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: adminEmail } });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { email: adminEmail },
+    });
     expect(prisma.user.create).not.toHaveBeenCalled();
   });
 
   it("creates admin if not exists", async () => {
-    (config.get as jest.Mock).mockReturnValueOnce(adminEmail).mockReturnValueOnce(adminPass);
+    (config.get as jest.Mock)
+      .mockReturnValueOnce(adminEmail)
+      .mockReturnValueOnce(adminPass);
     prisma.user.findUnique.mockResolvedValue(null);
     jest.spyOn(argon2, "hash").mockResolvedValue("hashedpass");
     await service.onModuleInit();
