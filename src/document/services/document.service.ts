@@ -53,6 +53,7 @@ export class DocumentService {
 
     const createdDocument = await this.documentRepo.createDocument({
       documentName: dto.documentName,
+      mimetype: pdf.mimetype,
       description: "",
       filePath: url,
       uploadDate: new Date(),
