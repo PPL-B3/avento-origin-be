@@ -1,8 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { HelloController } from './hello.controller';
-import { HelloService } from './hello.service';
+import { Test, TestingModule } from "@nestjs/testing";
+import { HelloController } from "./hello.controller";
+import { HelloService } from "./hello.service";
 
-describe('HelloController', () => {
+describe("HelloController", () => {
   let controller: HelloController;
   let helloService: HelloService;
 
@@ -23,14 +23,13 @@ describe('HelloController', () => {
     helloService = module.get<HelloService>(HelloService);
   });
 
-  it('should return messages from HelloService', async () => {
-    const expected = { messages: ['Hello from controller'] };
+  it("should return messages from HelloService", async () => {
+    const expected = { messages: ["Hello from controller"] };
     (helloService.getHello as jest.Mock).mockResolvedValue(expected);
 
     const result = await controller.getHello();
     expect(result).toEqual(expected);
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(helloService.getHello).toHaveBeenCalled();
   });
 });

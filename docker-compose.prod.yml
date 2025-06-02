@@ -1,0 +1,41 @@
+services:
+  nestjs:
+    image: ${IMAGE_NAME}
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - DATABASE_URL
+      - JWT_SECRET
+      - API_ENDPOINT
+      - DO_SPACES_BUCKET
+      - DO_SPACES_REGION
+      - DO_SPACES_ENDPOINT
+      - DO_SPACES_KEY
+      - DO_SPACES_SECRET
+      - GMAIL_USER
+      - GMAIL_PASS
+      - FE_URL
+      - ADMIN_EMAIL
+      - ADMIN_PASSWORD
+    ports:
+      - "4000:4000"
+    networks:
+      - public
+      - internal
+
+  database:
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+    networks:
+      - internal
+
+networks:
+  public:
+    driver: bridge
+  internal:
+    internal: true

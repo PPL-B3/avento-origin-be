@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class HelloService {
@@ -13,6 +13,6 @@ export class HelloService {
     if (msgs) {
       return { messages: msgs };
     }
-    return { messages: ['No messages available'] };
+    return { messages: ["No messages available"] };
   }
 }

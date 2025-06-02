@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { HelloService } from './hello.service';
-import { HelloController } from './hello.controller';
+import { Module } from "@nestjs/common";
+import { HelloService } from "./hello.service";
+import { HelloController } from "./hello.controller";
 
 @Module({
   providers: [HelloService],

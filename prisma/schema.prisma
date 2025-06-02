@@ -5,7 +5,7 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -14,9 +14,84 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+    USER
+    ADMIN
+}
+
 model Message {
   id        Int      @id @default(autoincrement())
   content   String
   createdAt DateTime @default(now())
+
   @@map("messages")
+}
+
+model User {
+  id         String @id @default(uuid())
+  createdAt  DateTime @default(now())
+  email      String @unique
+  password   String
+  role       Role @default(USER)
+  lastLogout BigInt
+
+  @@map("users")
+  @@index([createdAt])
+}
+
+model Document {
+  documentID   String   @id @default(uuid())
+  documentName String
+  filePath     String
+  uploadDate   DateTime @default(now())
+  publisher    String
+  qrCode       QrCode[]
+  AuditLog     AuditLog[]
+
+  pendingOwner    String?
+  otp             String?
+  otpExpiry       DateTime?
+  otpAttemptCount Int @default(0)
+}
+
+model QrCode {
+    id String @id @default(uuid())
+    owner String
+    isPrivate Boolean
+    isActive Boolean
+    generatedDate DateTime @default(now())
+
+    document Document @relation(fields: [documentId], references: [documentID])
+    documentId String
+
+    qrCodeOTP     QrCodeOTP? // <-- Add this (optional, because not all QR codes have OTPs)
+
+    @@map("qrcodes")
+}
+
+model QrCodeOTP {
+  id            String   @id @default(uuid())
+  qrCode        QrCode   @relation(fields: [qrCodeId], references: [id])
+  qrCodeId      String   @unique
+  otp           String
+  expiry        DateTime
+  attemptCount  Int      @default(0)
+  cooldown DateTime
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("qrcode_otps")
+}
+
+model AuditLog {
+  logID      String    @id @default(uuid())
+  eventType  String
+  timestamp  DateTime  @default(now())
+  userID     String
+  document   Document? @relation(fields: [documentID], references: [documentID])
+  documentID String?
+  details    String
+
+  @@map("audit_logs")
 }
