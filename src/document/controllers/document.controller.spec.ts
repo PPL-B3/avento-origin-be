@@ -19,7 +19,7 @@ import { JwtService } from "../../auth/jwt/jwt.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { ConfigService } from "@nestjs/config";
 import { JwtAuthMiddleware } from "../../auth/jwt/middleware/jwt-auth.middleware";
-import { RolesGuard } from "../../auth/roles.guard";
+import { RolesGuard } from "../../auth/guards/roles.guard";
 
 @Injectable()
 class MockAuthGuard implements CanActivate {
