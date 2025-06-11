@@ -46,6 +46,7 @@ model Document {
   uploadDate   DateTime @default(now())
   publisher    String
   qrCode       QrCode[]
+  publicViewCount Int      @default(0)
   AuditLog     AuditLog[]
 
   pendingOwner    String?
