@@ -1,0 +1,70 @@
+[
+  {
+    "logID": "62f7caa8-8e29-41fb-b65a-5e47a4218e3b",
+    "eventType": "LOGIN",
+    "timestamp": "2025-05-01 15:42:00.068",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "details": "User with email user1@example.com logged in."
+  },
+  {
+    "logID": "d6533f8a-3019-4289-818e-2464135f45b3",
+    "eventType": "LOGIN",
+    "timestamp": "2025-05-01 15:45:47.689",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "details": "User with email user1@example.com logged in."
+  },
+  {
+    "logID": "703f6e9c-ac69-4630-975c-9de101c35c00",
+    "eventType": "UPLOAD_DOCUMENT",
+    "timestamp": "2025-05-01 15:46:21.461",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "documentID": "a891297c-1049-41bf-9862-86fd25c77510",
+    "details": "Document \"index_compression.pdf\" uploaded."
+  },
+  {
+    "logID": "278d6431-3d90-4b90-bf5c-c8d2995b419c",
+    "eventType": "UPLOAD_DOCUMENT",
+    "timestamp": "2025-05-01 15:47:30.367",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "documentID": "a7f9c8de-54ed-453b-9732-8951371b84cb",
+    "details": "Document \"3_popular_tokenizers.pdf\" uploaded."
+  },
+  {
+    "logID": "53d15884-1539-4cb8-8f01-5d5d4bd17f48",
+    "eventType": "TRANSFER_OWNERSHIP",
+    "timestamp": "2025-05-01 15:48:44.994",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "documentID": "a891297c-1049-41bf-9862-86fd25c77510",
+    "details": "Ownership transfer initiated for document \"index_compression.pdf\" to yet.another.user3@another.example.com"
+  },
+  {
+    "logID": "05eaaa69-2548-4a58-ae92-863545094a7d",
+    "eventType": "TRANSFER_OWNERSHIP",
+    "timestamp": "2025-05-01 15:48:57.928",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "documentID": "a891297c-1049-41bf-9862-86fd25c77510",
+    "details": "Ownership transfer initiated for document \"index_compression.pdf\" to another.user2@another.example.com"
+  },
+  {
+    "logID": "9d8f3ba4-ff5a-4861-85be-5b004ef5e75d",
+    "eventType": "CLAIM_DOCUMENT",
+    "timestamp": "2025-05-01 15:49:32.579",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "documentID": "a891297c-1049-41bf-9862-86fd25c77510",
+    "details": "Document \"index_compression.pdf\" successfully claimed."
+  },
+  {
+    "logID": "49a1417a-ec28-448a-b5dc-422369ca6b26",
+    "eventType": "LOGOUT",
+    "timestamp": "2025-05-01 15:50:21.56",
+    "userID": "df2f75a8-2839-47f7-b40c-659217f4bc7d",
+    "details": "User with email user1@example.com logged out."
+  },
+  {
+    "logID": "0df65499-187a-46d4-ae3b-ca496daf6da8",
+    "eventType": "LOGIN",
+    "timestamp": "2025-05-01 15:50:55.684",
+    "userID": "b25958e1-bd30-411f-824f-afaa203e797c",
+    "details": "User with email admin@avento.com logged in."
+  }
+]

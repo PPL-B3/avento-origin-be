@@ -57,6 +57,9 @@ jobs:
       - name: Apply Migrations
         run: pnpx prisma migrate deploy
 
+      - name: Run Database Seed
+        run: pnpm run seed
+
       - name: Run tests with coverage
         run: pnpm test --coverage --ci
 

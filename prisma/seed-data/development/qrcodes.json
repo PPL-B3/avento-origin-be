@@ -1,0 +1,50 @@
+[
+  {
+    "id": "6b6493f2-dbbc-4386-968e-60f974369159",
+    "owner": "user1@example.com",
+    "isPrivate": false,
+    "isActive": true,
+    "generatedDate": "2025-05-01T15:47:30.361Z",
+    "documentId": "a7f9c8de-54ed-453b-9732-8951371b84cb"
+  },
+  {
+    "id": "f869f321-a970-4d5c-99aa-07d3e35cbefe",
+    "owner": "user1@example.com",
+    "isPrivate": true,
+    "isActive": true,
+    "generatedDate": "2025-05-01T15:47:30.361Z",
+    "documentId": "a7f9c8de-54ed-453b-9732-8951371b84cb"
+  },
+  {
+    "id": "13b5b18f-db4e-4b6b-a015-41e6dcfde4b6",
+    "owner": "user1@example.com",
+    "isPrivate": false,
+    "isActive": false,
+    "generatedDate": "2025-05-01T15:46:21.434Z",
+    "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
+  },
+  {
+    "id": "508857e4-6b23-436d-8a6b-bcfd088a11f1",
+    "owner": "user1@example.com",
+    "isPrivate": true,
+    "isActive": false,
+    "generatedDate": "2025-05-01T15:46:21.434Z",
+    "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
+  },
+  {
+    "id": "58743324-8e3a-44bc-858d-21f44e184cd5",
+    "owner": "another.user2@another.example.com",
+    "isPrivate": false,
+    "isActive": true,
+    "generatedDate": "2025-05-01T15:49:32.571Z",
+    "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
+  },
+  {
+    "id": "72d972af-8f9a-43da-be0e-a47105df17cf",
+    "owner": "another.user2@another.example.com",
+    "isPrivate": true,
+    "isActive": true,
+    "generatedDate": "2025-05-01T15:49:32.571Z",
+    "documentId": "a891297c-1049-41bf-9862-86fd25c77510"
+  }
+]
