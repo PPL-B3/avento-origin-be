@@ -58,6 +58,11 @@ export class DocumentService {
       publisher: user.email,
     });
 
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { uploadCount: { increment: 1 } },
+    });
+
     await this.auditLogService.addAuditLog({
       eventType: "UPLOAD_DOCUMENT",
       userID: user.id,
@@ -344,6 +349,15 @@ export class DocumentService {
     // Include filePath only if the requested QR code is private.
     if (qrCode.isPrivate) {
       response.filePath = document.filePath;
+    } else {
+      await this.prisma.document.update({
+        where: { documentID: document.documentID },
+        data: {
+          publicViewCount: {
+            increment: 1,
+          },
+        },
+      });
     }
 
     return response;

@@ -1,4 +1,4 @@
-name: CI/CD for NestJS using Docker Hub
+name: Continuous Integration (CI) for NestJS app using Docker Hub
 
 on:
   push:
@@ -23,9 +23,9 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U testuser -d testdb"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-interval 8s
+          --health-timeout 4s
+          --health-retries 4
 
     env:
       DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
@@ -42,25 +42,25 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
+          node-version: "22"
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-    #   - name: Lint the code
-    #     run: pnpm lint
+      #   - name: Lint the code
+      #     run: pnpm lint
 
       - name: Generate Prisma Client
         run: pnpx prisma generate
 
-      - name: Apply Migrations
+      - name: Apply migrations
         run: pnpx prisma migrate deploy
 
       - name: Run tests with coverage
         run: pnpm test --coverage --ci
 
-      - name: SonarQube Scan
+      - name: SonarQube scan
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_CSUI }}
@@ -68,6 +68,6 @@ jobs:
 
       - name: SonarQube Quality Gate
         uses: SonarSource/sonarqube-quality-gate-action@v1
-        timeout-minutes: 5
+        timeout-minutes: 4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_CSUI }}

@@ -34,8 +34,13 @@ describe("DocumentService", () => {
     prisma = {
       $transaction: jest.fn().mockImplementation((fn) => fn(prisma)),
       user: {
+        update: jest.fn(),
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
+      },
+      document: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
       },
       qrCode: {
         findUnique: jest.fn(),
@@ -94,6 +99,10 @@ describe("DocumentService", () => {
       expect(result).toEqual({
         privateId: "new-qr-private",
         publicId: "new-qr-public",
+      });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-id-123" },
+        data: { uploadCount: { increment: 1 } },
       });
     });
 
@@ -172,6 +181,7 @@ describe("DocumentService", () => {
         filePath: "url",
         uploadDate: new Date(),
         publisher: "Alice",
+        publicViewCount: 0,
         pendingOwner: null,
         otp: null,
         otpExpiry: null,
@@ -245,6 +255,7 @@ describe("DocumentService", () => {
       filePath: "url",
       uploadDate: new Date(),
       publisher: "Alice",
+      publicViewCount: 0,
       pendingOwner: "newowner@example.com",
       otp: "123456",
       otpExpiry: new Date(Date.now() + 5 * 60 * 1000),
@@ -545,6 +556,7 @@ describe("DocumentService", () => {
         documentName: "Test Doc",
         uploadDate: new Date("2025-04-05T12:00:00Z"),
         publisher: "Test Publisher",
+        publicViewCount: 0,
         filePath: "/path/to/file",
         qrCode: [
           {
