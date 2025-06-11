@@ -16,6 +16,7 @@ import { AuditLogModule } from "./auditLog/auditLog.module";
 import { JwtAuthMiddleware } from "./auth/jwt/middleware/jwt-auth.middleware";
 import { RolesGuard } from "./auth/roles.guard";
 import { AdminSeederService } from "./auth/adminseeder.service";
+import {MetricsModule} from "./pushBack/metrics.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AdminSeederService } from "./auth/adminseeder.service";
       isGlobal: true,
     }),
     AuditLogModule,
+    MetricsModule,
   ],
   providers: [
     PrismaService,

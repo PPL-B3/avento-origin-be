@@ -28,13 +28,17 @@ import { ReverseOwnershipDTO } from "../dto/reverse-ownership.dto";
 import { Roles } from "../../auth/roles.decorator";
 import { JwtAuthMiddleware } from "../../auth/jwt/middleware/jwt-auth.middleware";
 import { RolesGuard } from "../../auth/roles.guard";
+import { MetricService } from "../../pushBack/metric.service";
 
 @Controller("documents")
 export class DocumentController {
   private readonly MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB.
   private readonly FILE_TYPE = "application/pdf"; // PDF.
 
-  constructor(private readonly docService: DocumentService) {}
+  constructor(
+    private readonly docService: DocumentService,
+    private readonly metricService: MetricService,
+  ) {}
 
   @Post("upload")
   @UseInterceptors(FileInterceptor("file"))
@@ -81,31 +85,100 @@ export class DocumentController {
   async uploadDocument(
     @UploadedFile() file: Express.Multer.File,
     @Req() request: Request,
-    @Body() body: UploadDocumentDTO
+    @Body() body: UploadDocumentDTO,
   ) {
-    if (!file) {
-      throw new BadRequestException("No file uploaded.");
-    }
-    if (file.mimetype !== this.FILE_TYPE) {
-      throw new BadRequestException("Invalid file type.");
-    }
-    if (file.size > this.MAX_FILE_SIZE) {
-      throw new BadRequestException("File size exceeds 8MB limit.");
-    }
+    // Start timing the upload
+    const startTime = Date.now();
 
-    return await this.docService.uploadDocument(
-      file,
-      body,
-      request["user"].userId
-    );
+    try {
+      if (!file) {
+        this.metricService.updateDocumentUploadFailureMetric();
+        throw new BadRequestException("No file uploaded.");
+      }
+      if (file.mimetype !== this.FILE_TYPE) {
+        this.metricService.updateDocumentUploadFailureMetric();
+        throw new BadRequestException("Invalid file type.");
+      }
+      if (file.size > this.MAX_FILE_SIZE) {
+        this.metricService.updateDocumentUploadFailureMetric();
+        throw new BadRequestException("File size exceeds 8MB limit.");
+      }
+
+      // Track file size
+      this.metricService.updateDocumentUploadSizeMetric(file.size);
+
+      // Call the document service
+      const result = await this.docService.uploadDocument(
+        file,
+        body,
+        request["user"].userId,
+      );
+
+      // Record successful upload
+      this.metricService.updateDocumentUploadMetric();
+
+      // Calculate and record duration
+      const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+      this.metricService.updateDocumentUploadDurationMetric(duration);
+
+      // Push metrics to gateway
+      await this.metricService.pushMetricsToGateway(
+        "document_upload",
+        "document_controller",
+      );
+
+      return result;
+    } catch (error) {
+      // Record upload failure
+      this.metricService.updateDocumentUploadFailureMetric();
+
+      // Push failure metrics to gateway
+      await this.metricService.pushMetricsToGateway(
+        "document_upload_failure",
+        "document_controller",
+      );
+
+      throw error;
+    }
   }
 
   @Post("transfer")
   async transferDocument(@Body() body: TransferDocumentDTO) {
-    return await this.docService.transferDocument(
-      body.documentId,
-      body.pendingOwner
-    );
+    // Start timing the transfer
+    const startTime = Date.now();
+
+    try {
+      const result = await this.docService.transferDocument(
+        body.documentId,
+        body.pendingOwner,
+      );
+
+      // Record successful transfer
+      this.metricService.updateDocumentTransferMetric();
+
+      // Calculate and record duration
+      const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+      this.metricService.updateDocumentTransferDurationMetric(duration);
+
+      // Push metrics to gateway
+      await this.metricService.pushMetricsToGateway(
+        "document_transfer",
+        "document_controller",
+      );
+
+      return result;
+    } catch (error) {
+      // Record transfer failure
+      this.metricService.updateDocumentTransferFailureMetric();
+
+      // Push failure metrics to gateway
+      await this.metricService.pushMetricsToGateway(
+        "document_transfer_failure",
+        "document_controller",
+      );
+
+      throw error;
+    }
   }
 
   @Post("claim")
@@ -122,7 +195,7 @@ export class DocumentController {
   @UseGuards(JwtAuthMiddleware, RolesGuard)
   @Roles("ADMIN")
   async getDocument(
-    @Param("documentId", new ParseUUIDPipe()) documentId: string
+    @Param("documentId", new ParseUUIDPipe()) documentId: string,
   ) {
     return this.docService.getDocument(documentId);
   }
@@ -144,8 +217,11 @@ export class DocumentController {
 
   @Get("test-error")
   testError(): never {
+    // Record error metric
+    this.metricService.updateDocumentUploadFailureMetric();
+
     throw new Error(
-      "This is a test error. Should always trigger error handler."
+      "This is a test error. Should always trigger error handler.",
     );
   }
 }
