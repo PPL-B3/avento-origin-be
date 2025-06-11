@@ -17,6 +17,7 @@ CREATE TABLE "users" (
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "role" "Role" NOT NULL DEFAULT 'USER',
+    "uploadCount" INTEGER NOT NULL DEFAULT 0,
     "lastLogout" BIGINT NOT NULL,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
@@ -29,6 +30,8 @@ CREATE TABLE "Document" (
     "filePath" TEXT NOT NULL,
     "uploadDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "publisher" TEXT NOT NULL,
+    "publicViewCount" INTEGER NOT NULL DEFAULT 0,
+    "selfExpiry" TIMESTAMP(3),
     "pendingOwner" TEXT,
     "otp" TEXT,
     "otpExpiry" TIMESTAMP(3),

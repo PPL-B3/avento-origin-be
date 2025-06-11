@@ -1,8 +1,8 @@
 services:
   nestjs:
-    depends_on:
-      database:
-        condition: service_healthy
+    # depends_on:
+    #   database:
+    #     condition: service_healthy
     restart: &restartpolicy unless-stopped
 
   database:
