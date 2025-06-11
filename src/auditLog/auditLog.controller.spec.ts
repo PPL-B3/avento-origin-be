@@ -2,7 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { AuditLogService } from "./auditLog.service";
 import { AuditLogController } from "./auditLog.controller";
 import { JwtAuthMiddleware } from "../auth/jwt/middleware/jwt-auth.middleware";
-import { RolesGuard } from "../auth/roles.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { JwtService } from "../auth/jwt/jwt.service";
 import { PrismaService } from "../prisma/prisma.service";
 

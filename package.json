@@ -87,7 +87,6 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "globalSetup": "../jest.setup.ts",
     "collectCoverageFrom": [
       "**/*.ts",
       "!**/*.module.ts",
